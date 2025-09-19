@@ -25,7 +25,7 @@ import json
 # Add src to path for imports
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
-from data_quality.engine import DataQualityEngine, DataQualityReport
+from ydata_profiling import ProfileReport
 from data_quality.anomaly_detector import StatisticalAnomalyDetector
 from connectors.data_connectors import DataConnectorFactory
 from llm.analyzer import DataQualityLLMAnalyzer, LLMConfig
@@ -41,14 +41,22 @@ st.set_page_config(
 # Initialize session state
 def initialize_session_state():
     """Initialize session state variables"""
+    if 'datasets' not in st.session_state:
+        st.session_state.datasets = {}  # Dictionary to store multiple datasets
+    if 'current_dataset' not in st.session_state:
+        st.session_state.current_dataset = None  # Currently selected dataset
     if 'data' not in st.session_state:
-        st.session_state.data = None
-    if 'quality_report' not in st.session_state:
-        st.session_state.quality_report = None
+        st.session_state.data = None  # For backward compatibility
+    if 'ydata_profiles' not in st.session_state:
+        st.session_state.ydata_profiles = {}  # ydata-profiling reports for each dataset
+    if 'ydata_profile' not in st.session_state:
+        st.session_state.ydata_profile = None  # Currently selected profile
     if 'recommendations' not in st.session_state:
         st.session_state.recommendations = None
+    if 'connectors' not in st.session_state:
+        st.session_state.connectors = {}  # Connectors for each dataset
     if 'connector' not in st.session_state:
-        st.session_state.connector = None
+        st.session_state.connector = None  # For backward compatibility
     if 'profiling_complete' not in st.session_state:
         st.session_state.profiling_complete = False
 
@@ -66,19 +74,19 @@ def main():
         
         # Engine configuration
         chunk_size = st.slider("Chunk Size", min_value=50000, max_value=900000, value=100000, step=50000,
-                              help="Size of data chunks for parallel processing")
+                              help="Size of data chunks for parallel processing", key="main_chunk_size")
         max_workers = st.slider("Max Workers", min_value=1, max_value=8, value=4,
-                               help="Number of parallel threads")
+                               help="Number of parallel threads", key="main_max_workers")
         anomaly_threshold = st.slider("Anomaly Threshold", min_value=1.0, max_value=5.0, value=2.0, step=0.1,
-                                    help="Z-score threshold for anomaly detection")
+                                    help="Z-score threshold for anomaly detection", key="main_anomaly_threshold")
         
         # LLM configuration
         st.subheader("🤖 AI Recommendations")
         use_llm = st.checkbox("Enable AI Recommendations", value=False)
         if use_llm:
             api_key = st.text_input("LLM API Key", type="password", help="Optional: Enter your LLM API key for AI recommendations")
-            model = st.selectbox("Model", ["gpt-3.5-turbo", "gpt-4", "claude-3-sonnet"], index=0)
-    
+            model = st.selectbox("Model", ["gpt-3.5-turbo", "gpt-4", "claude-3-sonnet",], index=0)
+
     # Create tabs
     tab1, tab2, tab3, tab4 = st.tabs(["📁 Data Source", "📊 Data Profiling", "🎯 Anomaly Detection", "🤖 AI Recommendations"])
     
@@ -100,73 +108,270 @@ def data_source_tab():
     
     # Data source selection
     source_type = st.selectbox("Select Data Source Type", 
-                               ["CSV File", "Excel File"],
+                               ["Multiple CSV Files", "Single CSV File", "Excel File"],
                                help="Choose your data source type")
     
-    if source_type == "CSV File":
-        handle_csv_upload()
+    if source_type == "Multiple CSV Files":
+        handle_multiple_csv_upload()
+    elif source_type == "Single CSV File":
+        handle_single_csv_upload()
     elif source_type == "Excel File":
         handle_excel_upload()
+    
+    # Display loaded datasets
+    display_loaded_datasets()
 
-def handle_csv_upload():
-    """Handle CSV file upload"""
-    st.subheader("📄 CSV File Upload")
+def handle_single_csv_upload():
+    """Handle single CSV file upload"""
+    st.subheader("📄 Single CSV File Upload")
     
     # File upload
-    uploaded_file = st.file_uploader("Choose a CSV file", type=['csv'])
+    uploaded_file = st.file_uploader("Choose a CSV file", type=['csv'], key="single_csv_uploader")
     
     if uploaded_file is not None:
         # CSV configuration
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            encoding = st.selectbox("Encoding", ["utf-8", "latin-1", "cp1252"], index=0)
+            encoding = st.selectbox("Encoding", ["utf-8", "latin-1", "cp1252"], index=0, key="single_csv_encoding")
         with col2:
-            delimiter = st.selectbox("Delimiter", [",", ";", "\t", "|"], index=0)
+            delimiter = st.selectbox("Delimiter", [",", ";", "\t", "|"], index=0, key="single_csv_delimiter")
         with col3:
             load_full = st.checkbox("Load Full Dataset", value=True, 
-                                   help="Uncheck to load only a sample for testing")
+                                   help="Uncheck to load only a sample for testing", key="single_csv_load_full")
         
         if not load_full:
-            sample_rows = st.number_input("Sample Rows", min_value=100, max_value=10000, value=1000)
+            sample_rows = st.number_input("Sample Rows", min_value=100, max_value=10000, value=1000, key="single_csv_sample_rows")
         else:
             sample_rows = None
         
-        if st.button("Load CSV Data", type="primary"):
-            try:
-                with st.spinner("Loading CSV data..."):
-                    # Save uploaded file temporarily
-                    temp_path = f"temp_{uploaded_file.name}"
-                    with open(temp_path, "wb") as f:
-                        f.write(uploaded_file.getbuffer())
+        if st.button("Load CSV Data", type="primary", key="load_single_csv_button"):
+            load_single_csv_file(uploaded_file, encoding, delimiter, sample_rows)
+            load_single_csv_file(uploaded_file, encoding, delimiter, sample_rows)
+
+def load_single_csv_file(uploaded_file, encoding, delimiter, sample_rows):
+    """Load a single CSV file and store in session state"""
+    try:
+        with st.spinner("Loading CSV data..."):
+            # Save uploaded file temporarily
+            temp_path = f"temp_{uploaded_file.name}"
+            with open(temp_path, "wb") as f:
+                f.write(uploaded_file.getbuffer())
+            
+            # Create connector and load data
+            connector = DataConnectorFactory.create_connector(
+                'csv',
+                file_path=temp_path,
+                encoding=encoding,
+                delimiter=delimiter
+            )
+            
+            if connector.connect():
+                df = connector.get_data(limit=sample_rows)
+                
+                # Store in session state (backward compatibility)
+                st.session_state.data = df
+                st.session_state.connector = connector
+                
+                # Also store in datasets for multi-file support
+                dataset_name = uploaded_file.name
+                st.session_state.datasets[dataset_name] = df
+                st.session_state.connectors[dataset_name] = connector
+                st.session_state.current_dataset = dataset_name
+                
+                # Clean up temp file
+                os.remove(temp_path)
+                
+                st.success(f"✅ Successfully loaded {len(df):,} rows and {len(df.columns)} columns")
+                
+                # Show data preview
+                show_data_preview(df)
+            else:
+                st.error("❌ Failed to connect to CSV file")
+                
+    except Exception as e:
+        st.error(f"❌ Error loading CSV: {str(e)}")
+        if 'temp_path' in locals() and os.path.exists(temp_path):
+            os.remove(temp_path)
+
+def handle_multiple_csv_upload():
+    """Handle multiple CSV file uploads"""
+    st.subheader("📄 Multiple CSV Files Upload")
+    
+    # File upload for multiple files
+    uploaded_files = st.file_uploader(
+        "Choose CSV files", 
+        type=['csv'], 
+        accept_multiple_files=True,
+        key="multiple_csv_uploader",
+        help="You can select multiple CSV files to upload and analyze separately"
+    )
+    
+    if uploaded_files:
+        st.write(f"**Selected {len(uploaded_files)} file(s):**")
+        for file in uploaded_files:
+            st.write(f"• {file.name} ({file.size:,} bytes)")
+        
+        # Common CSV configuration for all files
+        st.write("**Configuration (applies to all files):**")
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            encoding = st.selectbox("Encoding", ["utf-8", "latin-1", "cp1252"], index=0, key="multi_csv_encoding")
+        with col2:
+            delimiter = st.selectbox("Delimiter", [",", ";", "\t", "|"], index=0, key="multi_csv_delimiter")
+        with col3:
+            load_full = st.checkbox("Load Full Dataset", value=True, 
+                                   help="Uncheck to load only a sample for testing", key="multi_csv_load_full")
+        
+        if not load_full:
+            sample_rows = st.number_input("Sample Rows", min_value=100, max_value=10000, value=1000, key="multi_csv_sample_rows")
+        else:
+            sample_rows = None
+        
+        if st.button("Load All CSV Files", type="primary", key="load_multiple_csv_button"):
+            load_multiple_csv_files(uploaded_files, encoding, delimiter, sample_rows)
+
+def load_multiple_csv_files(uploaded_files, encoding, delimiter, sample_rows):
+    """Load multiple CSV files and store each in session state"""
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    successful_loads = 0
+    failed_loads = []
+    
+    for i, uploaded_file in enumerate(uploaded_files):
+        status_text.text(f"Loading {uploaded_file.name}...")
+        progress_bar.progress((i + 1) / len(uploaded_files))
+        
+        try:
+            # Save uploaded file temporarily
+            temp_path = f"temp_{uploaded_file.name}"
+            with open(temp_path, "wb") as f:
+                f.write(uploaded_file.getbuffer())
+            
+            # Create connector and load data
+            connector = DataConnectorFactory.create_connector(
+                'csv',
+                file_path=temp_path,
+                encoding=encoding,
+                delimiter=delimiter
+            )
+            
+            if connector.connect():
+                df = connector.get_data(limit=sample_rows)
+                
+                # Store in datasets
+                dataset_name = uploaded_file.name
+                st.session_state.datasets[dataset_name] = df
+                st.session_state.connectors[dataset_name] = connector
+                
+                # Set first file as current dataset for backward compatibility
+                if i == 0:
+                    st.session_state.data = df
+                    st.session_state.connector = connector
+                    st.session_state.current_dataset = dataset_name
+                
+                successful_loads += 1
+                
+                # Clean up temp file
+                os.remove(temp_path)
+                
+            else:
+                failed_loads.append(f"{uploaded_file.name}: Failed to connect")
+                
+        except Exception as e:
+            failed_loads.append(f"{uploaded_file.name}: {str(e)}")
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+    
+    # Clear progress indicators
+    progress_bar.empty()
+    status_text.empty()
+    
+    # Show results
+    if successful_loads > 0:
+        st.success(f"✅ Successfully loaded {successful_loads} out of {len(uploaded_files)} files")
+        
+        # Show summary of loaded datasets
+        st.write("**Loaded datasets:**")
+        for dataset_name, df in st.session_state.datasets.items():
+            st.write(f"• **{dataset_name}**: {len(df):,} rows, {len(df.columns)} columns")
+    
+    if failed_loads:
+        st.error("❌ Failed to load some files:")
+        for error in failed_loads:
+            st.write(f"• {error}")
+
+def display_loaded_datasets():
+    """Display loaded datasets and allow selection"""
+    if st.session_state.datasets:
+        st.subheader("📊 Loaded Datasets")
+        
+        # Dataset selection
+        dataset_names = list(st.session_state.datasets.keys())
+        
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            selected_dataset = st.selectbox(
+                "Select Dataset for Analysis", 
+                dataset_names,
+                index=dataset_names.index(st.session_state.current_dataset) if st.session_state.current_dataset in dataset_names else 0,
+                key="dataset_selector",
+                help="Choose which dataset to analyze in the other tabs"
+            )
+            
+            # Update current dataset and backward compatibility variables
+            if selected_dataset != st.session_state.current_dataset:
+                st.session_state.current_dataset = selected_dataset
+                st.session_state.data = st.session_state.datasets[selected_dataset]
+                st.session_state.connector = st.session_state.connectors[selected_dataset]
+                st.rerun()
+        
+        with col2:
+            if st.button("🗑️ Remove Selected Dataset", key="remove_dataset_button"):
+                if len(st.session_state.datasets) > 1:
+                    # Remove the selected dataset
+                    del st.session_state.datasets[selected_dataset]
+                    del st.session_state.connectors[selected_dataset]
                     
-                    # Create connector and load data
-                    connector = DataConnectorFactory.create_connector(
-                        'csv',
-                        file_path=temp_path,
-                        encoding=encoding,
-                        delimiter=delimiter
-                    )
-                    
-                    if connector.connect():
-                        df = connector.get_data(limit=sample_rows)
-                        st.session_state.data = df
-                        st.session_state.connector = connector
-                        
-                        # Clean up temp file
-                        os.remove(temp_path)
-                        
-                        st.success(f"✅ Successfully loaded {len(df):,} rows and {len(df.columns)} columns")
-                        
-                        # Show data preview
-                        show_data_preview(df)
+                    # Update current dataset to the first remaining one
+                    remaining_datasets = list(st.session_state.datasets.keys())
+                    if remaining_datasets:
+                        st.session_state.current_dataset = remaining_datasets[0]
+                        st.session_state.data = st.session_state.datasets[remaining_datasets[0]]
+                        st.session_state.connector = st.session_state.connectors[remaining_datasets[0]]
                     else:
-                        st.error("❌ Failed to connect to CSV file")
-                        
-            except Exception as e:
-                st.error(f"❌ Error loading CSV: {str(e)}")
-                if os.path.exists(temp_path):
-                    os.remove(temp_path)
+                        st.session_state.current_dataset = None
+                        st.session_state.data = None
+                        st.session_state.connector = None
+                    
+                    st.success(f"✅ Removed dataset: {selected_dataset}")
+                    st.rerun()
+                else:
+                    st.warning("⚠️ Cannot remove the last remaining dataset")
+        
+        # Display current dataset info
+        if st.session_state.current_dataset:
+            current_df = st.session_state.datasets[st.session_state.current_dataset]
+            
+            st.write(f"**Currently Selected**: {st.session_state.current_dataset}")
+            
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Rows", f"{len(current_df):,}")
+            with col2:
+                st.metric("Columns", len(current_df.columns))
+            with col3:
+                st.metric("Memory Usage", f"{current_df.memory_usage(deep=True).sum() / 1024**2:.1f} MB")
+            with col4:
+                st.metric("Total Datasets", len(st.session_state.datasets))
+            
+            # Show data preview
+            show_data_preview(current_df)
+    else:
+        st.info("📝 No datasets loaded yet. Please upload some CSV or Excel files above.")
 
 def handle_excel_upload():
     """Handle Excel file upload"""
@@ -188,14 +393,14 @@ def handle_excel_upload():
                 selected_sheet = st.selectbox("Select Sheet", sheet_names)
             with col2:
                 load_full = st.checkbox("Load Full Dataset", value=True, 
-                                       help="Uncheck to load only a sample for testing")
+                                       help="Uncheck to load only a sample for testing", key="excel_load_full")
             
             if not load_full:
-                sample_rows = st.number_input("Sample Rows", min_value=100, max_value=10000, value=1000)
+                sample_rows = st.number_input("Sample Rows", min_value=100, max_value=10000, value=1000, key="excel_sample_rows")
             else:
                 sample_rows = None
             
-            if st.button("Load Excel Data", type="primary"):
+            if st.button("Load Excel Data", type="primary", key="load_excel_button"):
                 try:
                     with st.spinner("Loading Excel data..."):
                         # Save uploaded file temporarily
@@ -273,6 +478,10 @@ def data_profiling_tab(chunk_size: int, max_workers: int, anomaly_threshold: flo
         st.warning("⚠️ Please load data first in the Data Source tab")
         return
     
+    # Show current dataset info
+    if st.session_state.current_dataset:
+        st.info(f"📊 **Analyzing Dataset**: {st.session_state.current_dataset}")
+    
     df = st.session_state.data
     
     # Profiling controls
@@ -281,8 +490,8 @@ def data_profiling_tab(chunk_size: int, max_workers: int, anomaly_threshold: flo
     with col1:
         # Calculate dataset size information
         dataset_size_mb = df.memory_usage(deep=True).sum() / 1024 / 1024
-        estimated_processing_time = len(df) * 0.001  # Rough estimate: 1ms per 1000 rows
-        
+        estimated_processing_time = len(df) * 0.00005  # Rough estimate: 0.05ms per row
+
         # Determine processing strategy message
         if len(df) > 100000:
             processing_strategy = "🚀 Large dataset - using parallel processing"
@@ -293,34 +502,32 @@ def data_profiling_tab(chunk_size: int, max_workers: int, anomaly_threshold: flo
         st.caption(f"{processing_strategy} • Est. processing time: ~{estimated_processing_time:.1f}s")
     
     with col2:
-        if st.button("🔄 Run Profiling", type="primary"):
+        if st.button("🔄 Run Profiling", type="primary", key="run_profiling_button"):
             run_data_profiling(df, chunk_size, max_workers, anomaly_threshold)
     
     # Show results if available
-    if st.session_state.quality_report:
-        display_profiling_results(st.session_state.quality_report)
+    if st.session_state.get('ydata_profile'):
+        display_ydata_profiling_results(st.session_state.ydata_profile)
 
 def run_data_profiling(df: pd.DataFrame, chunk_size: int, max_workers: int, anomaly_threshold: float):
-    """Run data profiling on the dataset"""
+    """Run data profiling on the dataset using ydata-profiling"""
     try:
-        with st.spinner("🔍 Running comprehensive data profiling..."):
-            # Initialize engine
-            engine = DataQualityEngine(
-                chunk_size=chunk_size,
-                max_workers=max_workers,
-                anomaly_threshold=anomaly_threshold
+        with st.spinner("🔍 Running comprehensive data profiling with ydata-profiling..."):
+            # Run profiling with timing
+            start_time = time.time()
+            
+            # Create profile report with ydata-profiling
+            profile = ProfileReport(
+                df, 
+                title=f"Data Profile Report - {st.session_state.current_dataset or 'Dataset'}",
+                explorative=True,
+                minimal=False
             )
             
-            # Run profiling with timing
-            with st.spinner("🔍 Profiling your dataset..."):
-                start_time = time.time()
-                report = engine.profile_dataset(df, "Dataset")
-                end_time = time.time()
+            end_time = time.time()
+            profiling_time = end_time - start_time
                 
-                # Calculate profiling time
-                profiling_time = end_time - start_time
-                
-            st.session_state.quality_report = report
+            st.session_state.ydata_profile = profile
             st.session_state.profiling_time = profiling_time
             st.session_state.profiling_complete = True
             
@@ -328,12 +535,148 @@ def run_data_profiling(df: pd.DataFrame, chunk_size: int, max_workers: int, anom
         
     except Exception as e:
         st.error(f"❌ Error during profiling: {str(e)}")
+        st.error(f"Details: {type(e).__name__}: {str(e)}")
 
-def display_profiling_results(report: DataQualityReport):
-    """Display profiling results with meaningful insights"""
+def display_ydata_profiling_results(profile):
+    """Display ydata-profiling results with interactive HTML report and summary"""
     
-    # Executive Summary
-    st.subheader("📈 Data Quality Executive Summary")
+    # Executive Summary from ydata-profiling
+    st.subheader("📈 Data Profiling Report")
+    
+    # Display profiling time if available
+    if hasattr(st.session_state, 'profiling_time') and st.session_state.profiling_time:
+        profiling_time = st.session_state.profiling_time
+        if profiling_time < 1:
+            time_display = f"{profiling_time*1000:.0f}ms"
+            time_status = "⚡ Fast"
+        elif profiling_time < 5:
+            time_display = f"{profiling_time:.2f}s"
+            time_status = "🟢 Quick"
+        elif profiling_time < 15:
+            time_display = f"{profiling_time:.1f}s"
+            time_status = "🟡 Normal"
+        else:
+            time_display = f"{profiling_time:.1f}s"
+            time_status = "🟠 Slow"
+        st.info(f"**Profiling Time**: {time_display} ({time_status})")
+    
+    # Options for displaying the report
+    st.subheader("📊 Report Options")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if st.button("📋 Show Quick Summary", type="primary"):
+            display_ydata_summary(profile)
+    
+    with col2:
+        if st.button("📄 Generate Full HTML Report", type="secondary"):
+            display_full_html_report(profile)
+    
+    with col3:
+        if st.button("💾 Download Report", type="secondary"):
+            download_html_report(profile)
+
+def display_ydata_summary(profile):
+    """Display a quick summary of the ydata-profiling results"""
+    st.subheader("📋 Quick Data Summary")
+    
+    # Get basic statistics from the profile
+    description = profile.description_set
+    
+    # Dataset overview
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        n_vars = description.get('n_var', 0)
+        st.metric("Variables", n_vars)
+    
+    with col2:
+        n_obs = description.get('n', 0)
+        st.metric("Observations", f"{n_obs:,}")
+    
+    with col3:
+        missing_cells = description.get('n_cells_missing', 0)
+        total_cells = description.get('n_cells', 1)
+        missing_percent = (missing_cells / total_cells) * 100 if total_cells > 0 else 0
+        st.metric("Missing Cells", f"{missing_percent:.1f}%")
+    
+    with col4:
+        duplicate_rows = description.get('n_duplicates', 0)
+        duplicate_percent = (duplicate_rows / n_obs) * 100 if n_obs > 0 else 0
+        st.metric("Duplicate Rows", f"{duplicate_percent:.1f}%")
+    
+    # Variable types
+    st.subheader("📊 Variable Types")
+    
+    types_summary = description.get('types', {})
+    if types_summary:
+        types_df = pd.DataFrame([
+            {"Type": type_name.replace('_', ' ').title(), "Count": count}
+            for type_name, count in types_summary.items()
+        ])
+        st.dataframe(types_df, use_container_width=True, hide_index=True)
+    
+    # Warnings and alerts
+    st.subheader("⚠️ Data Quality Alerts")
+    
+    alerts = []
+    
+    if missing_percent > 10:
+        alerts.append(f"🔸 High missing data: {missing_percent:.1f}% of cells are missing")
+    
+    if duplicate_percent > 5:
+        alerts.append(f"🔸 Duplicate rows detected: {duplicate_percent:.1f}% of rows are duplicates")
+    
+    n_constant = description.get('n_constant', 0)
+    if n_constant > 0:
+        alerts.append(f"🔸 Constant variables: {n_constant} variables have only one unique value")
+    
+    if not alerts:
+        st.success("✅ No major data quality issues detected!")
+    else:
+        for alert in alerts:
+            st.warning(alert)
+
+def display_full_html_report(profile):
+    """Display the full HTML report from ydata-profiling"""
+    st.subheader("� Full Profiling Report")
+    
+    try:
+        # Generate the HTML report
+        html_report = profile.to_html()
+        
+        # Display in Streamlit using components
+        st.components.v1.html(html_report, height=800, scrolling=True)
+        
+    except Exception as e:
+        st.error(f"Error generating HTML report: {str(e)}")
+        st.info("Try using the 'Show Quick Summary' option instead")
+
+def download_html_report(profile):
+    """Provide download link for the HTML report"""
+    st.subheader("💾 Download Report")
+    
+    try:
+        # Generate the HTML report
+        html_report = profile.to_html()
+        
+        # Create download button
+        dataset_name = st.session_state.current_dataset or "dataset"
+        filename = f"data_profile_report_{dataset_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+        
+        st.download_button(
+            label="📥 Download HTML Report",
+            data=html_report,
+            file_name=filename,
+            mime="text/html",
+            help="Download the complete profiling report as an HTML file"
+        )
+        
+        st.success("Report ready for download! Click the button above to save the HTML file.")
+        
+    except Exception as e:
+        st.error(f"Error preparing download: {str(e)}")
     
     # Quality interpretation
     quality_score = report.overall_quality_score
@@ -517,6 +860,10 @@ def anomaly_detection_tab(anomaly_threshold: float):
         st.warning("⚠️ Please load data first in the Data Source tab")
         return
     
+    # Show current dataset info
+    if st.session_state.current_dataset:
+        st.info(f"🎯 **Analyzing Dataset**: {st.session_state.current_dataset}")
+    
     df = st.session_state.data
     
     # Anomaly detection controls
@@ -530,7 +877,7 @@ def anomaly_detection_tab(anomaly_threshold: float):
         )
     
     with col2:
-        if st.button("🔍 Detect Anomalies", type="primary"):
+        if st.button("🔍 Detect Anomalies", type="primary", key="detect_anomalies_button"):
             st.session_state.anomaly_method = detection_method
             st.session_state.run_anomaly_detection = True
     
@@ -879,6 +1226,10 @@ def ai_recommendations_tab(use_llm: bool, api_key: str, model: str):
         st.warning("⚠️ Please load data first in the Data Source tab")
         return
     
+    # Show current dataset info
+    if st.session_state.current_dataset:
+        st.info(f"🤖 **Analyzing Dataset**: {st.session_state.current_dataset}")
+    
     if not st.session_state.profiling_complete:
         st.warning("⚠️ Please run data profiling first")
         return
@@ -890,7 +1241,7 @@ def ai_recommendations_tab(use_llm: bool, api_key: str, model: str):
         st.write("Generate AI-powered recommendations based on your data quality analysis")
     
     with col2:
-        if st.button("🤖 Get Recommendations", type="primary"):
+        if st.button("🤖 Get Recommendations", type="primary", key="get_recommendations_button"):
             generate_recommendations(api_key, model)
     
     # Show recommendations if available
