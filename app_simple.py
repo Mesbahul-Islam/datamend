@@ -15,8 +15,6 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-import seaborn as sns
 import sys
 import os
 import time
@@ -67,7 +65,7 @@ def main():
         st.header("⚙️ Configuration")
         
         # Engine configuration
-        chunk_size = st.slider("Chunk Size", min_value=500, max_value=10000, value=1000, step=500,
+        chunk_size = st.slider("Chunk Size", min_value=50000, max_value=900000, value=100000, step=50000,
                               help="Size of data chunks for parallel processing")
         max_workers = st.slider("Max Workers", min_value=1, max_value=8, value=4,
                                help="Number of parallel threads")
@@ -574,11 +572,10 @@ def run_anomaly_detection(df: pd.DataFrame, method: str, threshold: float):
         st.error(f"❌ Error during anomaly detection: {str(e)}")
 
 def create_anomaly_visualizations(df: pd.DataFrame, column: str, anomaly_result: Any):
-    """Create matplotlib visualizations for anomalies in a specific column"""
+    """Create scatter plot visualization for anomalies in a specific column"""
     
     # Set style for better looking plots
     plt.style.use('default')
-    sns.set_palette("husl")
     
     if not hasattr(anomaly_result, 'anomaly_indices') or not anomaly_result.anomaly_indices:
         return None
@@ -588,240 +585,39 @@ def create_anomaly_visualizations(df: pd.DataFrame, column: str, anomaly_result:
     if len(column_data) == 0:
         return None
         
-    # Create figure with multiple subplots
-    fig, axes = plt.subplots(2, 2, figsize=(15, 12))
-    fig.suptitle(f'Anomaly Analysis for Column: {column}', fontsize=16, fontweight='bold')
+    # Create a single scatter plot
+    fig, ax = plt.subplots(1, 1, figsize=(12, 6))
+    fig.suptitle(f'Anomaly Detection: {column}', fontsize=16, fontweight='bold')
     
     # Get anomaly indices and values
     anomaly_indices = anomaly_result.anomaly_indices
     normal_indices = [i for i in column_data.index if i not in anomaly_indices]
     
-    # 1. Scatter plot with highlighted anomalies
-    ax1 = axes[0, 0]
-    ax1.scatter(normal_indices, column_data.loc[normal_indices], 
+    # Scatter plot with highlighted anomalies
+    ax.scatter(normal_indices, column_data.loc[normal_indices], 
                alpha=0.6, c='blue', label='Normal Data', s=30)
     if anomaly_indices:
-        ax1.scatter(anomaly_indices, column_data.loc[anomaly_indices], 
-                   alpha=0.8, c='red', label='Anomalies', s=60, marker='X')
-    ax1.set_title('Data Points with Anomalies Highlighted', fontweight='bold')
-    ax1.set_xlabel('Index')
-    ax1.set_ylabel('Value')
-    ax1.legend()
-    ax1.grid(True, alpha=0.3)
+        ax.scatter(anomaly_indices, column_data.loc[anomaly_indices], 
+                   alpha=0.9, c='red', label='Anomalies', s=80, marker='X')
     
-    # 2. Box plot showing outliers
-    ax2 = axes[0, 1]
-    box_data = [column_data.loc[normal_indices], column_data.loc[anomaly_indices]] if anomaly_indices else [column_data]
-    labels = ['Normal Data', 'Anomalies'] if anomaly_indices else ['All Data']
-    bp = ax2.boxplot(box_data, labels=labels, patch_artist=True)
+    ax.set_title('Data Points with Anomalies Highlighted', fontweight='bold')
+    ax.set_xlabel('Data Point Index')
+    ax.set_ylabel(f'{column} Value')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
     
-    # Color the boxes
-    colors = ['lightblue', 'lightcoral'] if anomaly_indices else ['lightblue']
-    for patch, color in zip(bp['boxes'], colors):
-        patch.set_facecolor(color)
-    
-    ax2.set_title('Box Plot Comparison', fontweight='bold')
-    ax2.set_ylabel('Value')
-    ax2.grid(True, alpha=0.3)
-    
-    # 3. Histogram with anomaly distribution
-    ax3 = axes[1, 0]
-    
-    # Plot histogram for normal data
-    normal_data = column_data.loc[normal_indices]
-    ax3.hist(normal_data, bins=30, alpha=0.7, color='blue', label='Normal Data', density=True)
-    
-    # Plot histogram for anomalies if any
+    # Add some statistics as text
     if anomaly_indices:
-        anomaly_data = column_data.loc[anomaly_indices]
-        ax3.hist(anomaly_data, bins=15, alpha=0.8, color='red', label='Anomalies', density=True)
-    
-    # Add threshold lines if available
-    if hasattr(anomaly_result, 'threshold'):
-        mean_val = column_data.mean()
-        std_val = column_data.std()
-        threshold = anomaly_result.threshold
+        anomaly_count = len(anomaly_indices)
+        total_count = len(column_data)
+        anomaly_percentage = (anomaly_count / total_count) * 100
         
-        ax3.axvline(mean_val - threshold * std_val, color='orange', linestyle='--', 
-                   label=f'Lower Threshold', alpha=0.7)
-        ax3.axvline(mean_val + threshold * std_val, color='orange', linestyle='--', 
-                   label=f'Upper Threshold', alpha=0.7)
-    
-    ax3.set_title('Distribution Analysis', fontweight='bold')
-    ax3.set_xlabel('Value')
-    ax3.set_ylabel('Density')
-    ax3.legend()
-    ax3.grid(True, alpha=0.3)
-    
-    # 4. Summary statistics comparison
-    ax4 = axes[1, 1]
-    
-    # Calculate statistics
-    normal_stats = {
-        'Mean': normal_data.mean(),
-        'Median': normal_data.median(),
-        'Std': normal_data.std(),
-        'Min': normal_data.min(),
-        'Max': normal_data.max()
-    }
-    
-    if anomaly_indices:
-        anomaly_data = column_data.loc[anomaly_indices]
-        anomaly_stats = {
-            'Mean': anomaly_data.mean(),
-            'Median': anomaly_data.median(),
-            'Std': anomaly_data.std(),
-            'Min': anomaly_data.min(),
-            'Max': anomaly_data.max()
-        }
-        
-        # Create comparison bar chart
-        x_pos = np.arange(len(normal_stats))
-        width = 0.35
-        
-        normal_values = list(normal_stats.values())
-        anomaly_values = list(anomaly_stats.values())
-        
-        bars1 = ax4.bar(x_pos - width/2, normal_values, width, label='Normal Data', 
-                       color='blue', alpha=0.7)
-        bars2 = ax4.bar(x_pos + width/2, anomaly_values, width, label='Anomalies', 
-                       color='red', alpha=0.7)
-        
-        ax4.set_xlabel('Statistics')
-        ax4.set_ylabel('Value')
-        ax4.set_title('Statistical Comparison', fontweight='bold')
-        ax4.set_xticks(x_pos)
-        ax4.set_xticklabels(normal_stats.keys(), rotation=45)
-        ax4.legend()
-        ax4.grid(True, alpha=0.3)
-        
-        # Add value labels on bars
-        for bar in bars1:
-            height = bar.get_height()
-            ax4.text(bar.get_x() + bar.get_width()/2., height,
-                    f'{height:.2f}', ha='center', va='bottom', fontsize=8)
-        
-        for bar in bars2:
-            height = bar.get_height()
-            ax4.text(bar.get_x() + bar.get_width()/2., height,
-                    f'{height:.2f}', ha='center', va='bottom', fontsize=8)
-    else:
-        # Just show normal data statistics as text
-        stats_text = "\n".join([f"{k}: {v:.2f}" for k, v in normal_stats.items()])
-        ax4.text(0.5, 0.5, f"Column Statistics:\n\n{stats_text}", 
-                transform=ax4.transAxes, ha='center', va='center',
-                fontsize=12, bbox=dict(boxstyle="round,pad=0.3", facecolor="lightblue"))
-        ax4.set_title('Column Statistics', fontweight='bold')
-        ax4.axis('off')
+        stats_text = f'Anomalies: {anomaly_count}/{total_count} ({anomaly_percentage:.1f}%)'
+        ax.text(0.02, 0.98, stats_text, transform=ax.transAxes, 
+                bbox=dict(boxstyle="round,pad=0.3", facecolor="yellow", alpha=0.7),
+                verticalalignment='top', fontweight='bold')
     
     plt.tight_layout()
-    return fig
-
-def create_overall_anomaly_summary_plot(results: Dict[str, Dict[str, Any]], df: pd.DataFrame):
-    """Create an overall summary visualization of anomalies across all columns"""
-    
-    # Calculate anomaly counts per column
-    anomaly_counts = {}
-    anomaly_percentages = {}
-    
-    for column, column_results in results.items():
-        total_anomalies = 0
-        for method, anomaly_result in column_results.items():
-            if hasattr(anomaly_result, 'anomaly_indices'):
-                total_anomalies += len(set(anomaly_result.anomaly_indices))
-        
-        anomaly_counts[column] = total_anomalies
-        anomaly_percentages[column] = (total_anomalies / len(df)) * 100 if len(df) > 0 else 0
-    
-    if not any(anomaly_counts.values()):
-        return None
-    
-    # Create summary plots
-    fig, axes = plt.subplots(1, 2, figsize=(15, 6))
-    fig.suptitle('Anomaly Detection Summary Across All Columns', fontsize=16, fontweight='bold')
-    
-    # 1. Bar chart of anomaly counts
-    ax1 = axes[0]
-    columns = list(anomaly_counts.keys())
-    counts = list(anomaly_counts.values())
-    
-    # Color bars based on severity
-    colors = []
-    for count, total in zip(counts, [len(df)] * len(counts)):
-        percentage = (count / total) * 100 if total > 0 else 0
-        if percentage > 10:
-            colors.append('red')
-        elif percentage > 5:
-            colors.append('orange')
-        elif percentage > 1:
-            colors.append('yellow')
-        else:
-            colors.append('green')
-    
-    bars = ax1.bar(columns, counts, color=colors, alpha=0.7)
-    ax1.set_title('Anomaly Counts by Column', fontweight='bold')
-    ax1.set_xlabel('Columns')
-    ax1.set_ylabel('Number of Anomalies')
-    ax1.tick_params(axis='x', rotation=45)
-    ax1.grid(True, alpha=0.3)
-    
-    # Add value labels on bars
-    for bar in bars:
-        height = bar.get_height()
-        if height > 0:
-            ax1.text(bar.get_x() + bar.get_width()/2., height,
-                    f'{int(height)}', ha='center', va='bottom', fontweight='bold')
-    
-    # 2. Pie chart of anomaly distribution
-    ax2 = axes[1]
-    
-    # Filter out columns with no anomalies for pie chart
-    non_zero_columns = {k: v for k, v in anomaly_counts.items() if v > 0}
-    
-    if non_zero_columns:
-        labels = list(non_zero_columns.keys())
-        sizes = list(non_zero_columns.values())
-        
-        # Use different colors for different severity levels
-        pie_colors = []
-        for col in labels:
-            percentage = anomaly_percentages[col]
-            if percentage > 10:
-                pie_colors.append('#ff4444')  # Red
-            elif percentage > 5:
-                pie_colors.append('#ff8800')  # Orange
-            elif percentage > 1:
-                pie_colors.append('#ffdd00')  # Yellow
-            else:
-                pie_colors.append('#44ff44')  # Green
-        
-        wedges, texts, autotexts = ax2.pie(sizes, labels=labels, autopct='%1.1f%%', 
-                                          colors=pie_colors, startangle=90)
-        ax2.set_title('Anomaly Distribution by Column', fontweight='bold')
-        
-        # Enhance text
-        for autotext in autotexts:
-            autotext.set_color('white')
-            autotext.set_fontweight('bold')
-    else:
-        ax2.text(0.5, 0.5, 'No Anomalies\nDetected', ha='center', va='center',
-                transform=ax2.transAxes, fontsize=14, fontweight='bold',
-                bbox=dict(boxstyle="round,pad=0.3", facecolor="lightgreen"))
-        ax2.set_title('Anomaly Distribution', fontweight='bold')
-    
-    # Add legend for severity levels
-    severity_legend = [
-        mpatches.Patch(color='red', label='Critical (>10%)'),
-        mpatches.Patch(color='orange', label='High (5-10%)'),
-        mpatches.Patch(color='yellow', label='Medium (1-5%)'),
-        mpatches.Patch(color='green', label='Low (<1%)')
-    ]
-    
-    fig.legend(handles=severity_legend, loc='upper center', bbox_to_anchor=(0.5, 0.02), 
-              ncol=4, fontsize=10)
-    
-    plt.tight_layout()
-    plt.subplots_adjust(bottom=0.15)  # Make room for legend
     return fig
 
 def display_anomaly_results(results: Dict[str, Dict[str, Any]], df: pd.DataFrame):
@@ -931,15 +727,6 @@ def display_anomaly_results(results: Dict[str, Dict[str, Any]], df: pd.DataFrame
             st.metric("Data Reliability", f"{reliability:.0f}/100")
         
         st.info(f"**Assessment**: {assessment_message}")
-        
-        # Add overall summary visualization
-        st.subheader("📊 Anomaly Detection Visualizations")
-        
-        # Create and display overall summary plot
-        summary_fig = create_overall_anomaly_summary_plot(results, df)
-        if summary_fig:
-            st.pyplot(summary_fig, use_container_width=True)
-            plt.close(summary_fig)  # Close to free memory
         
         # Detailed Findings
         if total_anomalies > 0:

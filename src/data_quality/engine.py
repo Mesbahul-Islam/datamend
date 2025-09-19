@@ -15,6 +15,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime
 import warnings
+from multiprocessing import cpu_count
 
 warnings.filterwarnings('ignore')
 
@@ -83,7 +84,7 @@ class DataQualityEngine:
             anomaly_threshold: Z-score threshold for anomaly detection
         """
         self.chunk_size = chunk_size
-        self.max_workers = max_workers
+        self.max_workers = max(1, min(max_workers, cpu_count()))
         self.anomaly_threshold = anomaly_threshold
         
         logger.info(f"Data Quality Engine initialized with chunk_size={chunk_size}, "
