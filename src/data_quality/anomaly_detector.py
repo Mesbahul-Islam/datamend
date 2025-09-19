@@ -236,6 +236,19 @@ class StatisticalAnomalyDetector:
         Returns:
             AnomalyResult for IQR method
         """
+        # Check if IQR is zero (no variation in data)
+        if stats_summary.iqr == 0:
+            # No variation in data, no anomalies can be detected
+            return AnomalyResult(
+                method='iqr',
+                anomaly_indices=[],
+                anomaly_values=[],
+                anomaly_scores=[],
+                threshold=self.iqr_multiplier,
+                total_anomalies=0,
+                anomaly_percentage=0.0
+            )
+        
         # Identify anomalies outside IQR bounds
         anomaly_mask = (series < stats_summary.lower_bound) | (series > stats_summary.upper_bound)
         anomaly_indices = series.index[anomaly_mask].tolist()
