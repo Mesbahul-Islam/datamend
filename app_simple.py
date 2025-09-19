@@ -560,22 +560,20 @@ def display_ydata_profiling_results(profile):
             time_status = "🟠 Slow"
         st.info(f"**Profiling Time**: {time_display} ({time_status})")
     
-    # Options for displaying the report
-    st.subheader("📊 Report Options")
+    # Display options
+    st.subheader("📊 Report Display Options")
     
-    col1, col2, col3 = st.columns(3)
+    # Create tabs for different views
+    tab1, tab2, tab3 = st.tabs(["📋 Quick Summary", "📄 Detailed Report", "💾 Export Options"])
     
-    with col1:
-        if st.button("📋 Show Quick Summary", type="primary"):
-            display_ydata_summary(profile)
+    with tab1:
+        display_ydata_summary(profile)
     
-    with col2:
-        if st.button("📄 Generate Full HTML Report", type="secondary"):
-            display_full_html_report(profile)
+    with tab2:
+        display_enhanced_report(profile)
     
-    with col3:
-        if st.button("💾 Download Report", type="secondary"):
-            download_html_report(profile)
+    with tab3:
+        display_export_options(profile)
 
 def display_ydata_summary(profile):
     """Display a quick summary of the ydata-profiling results"""
@@ -583,33 +581,39 @@ def display_ydata_summary(profile):
     
     # Get basic statistics from the profile
     description = profile.description_set
+    table_stats = description.table
     
     # Dataset overview
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        n_vars = description.get('n_var', 0)
+        n_vars = table_stats.get('n_var', 0)
         st.metric("Variables", n_vars)
     
     with col2:
-        n_obs = description.get('n', 0)
+        n_obs = table_stats.get('n', 0)
         st.metric("Observations", f"{n_obs:,}")
     
     with col3:
-        missing_cells = description.get('n_cells_missing', 0)
-        total_cells = description.get('n_cells', 1)
+        missing_cells = table_stats.get('n_cells_missing', 0)
+        # Calculate total cells properly: rows * columns
+        n_obs = table_stats.get('n', 0)
+        n_vars = table_stats.get('n_var', 0)
+        total_cells = n_obs * n_vars if n_obs > 0 and n_vars > 0 else 1
         missing_percent = (missing_cells / total_cells) * 100 if total_cells > 0 else 0
+        # Alternative: use the percentage directly from ydata-profiling
+        # missing_percent = table_stats.get('p_cells_missing', 0) * 100
         st.metric("Missing Cells", f"{missing_percent:.1f}%")
     
     with col4:
-        duplicate_rows = description.get('n_duplicates', 0)
+        duplicate_rows = table_stats.get('n_duplicates', 0)
         duplicate_percent = (duplicate_rows / n_obs) * 100 if n_obs > 0 else 0
         st.metric("Duplicate Rows", f"{duplicate_percent:.1f}%")
     
     # Variable types
     st.subheader("📊 Variable Types")
     
-    types_summary = description.get('types', {})
+    types_summary = table_stats.get('types', {})
     if types_summary:
         types_df = pd.DataFrame([
             {"Type": type_name.replace('_', ' ').title(), "Count": count}
@@ -628,7 +632,7 @@ def display_ydata_summary(profile):
     if duplicate_percent > 5:
         alerts.append(f"🔸 Duplicate rows detected: {duplicate_percent:.1f}% of rows are duplicates")
     
-    n_constant = description.get('n_constant', 0)
+    n_constant = table_stats.get('n_constant', 0)
     if n_constant > 0:
         alerts.append(f"🔸 Constant variables: {n_constant} variables have only one unique value")
     
@@ -677,6 +681,207 @@ def download_html_report(profile):
         
     except Exception as e:
         st.error(f"Error preparing download: {str(e)}")
+
+def display_enhanced_report(profile):
+    """Display an enhanced report with better formatting"""
+    st.subheader("📊 Detailed Data Analysis")
+    
+    try:
+        # Get description for detailed analysis
+        description = profile.description_set
+        table_stats = description.table
+        variables = description.variables
+        
+        # Dataset Overview Section
+        st.markdown("### 📈 Dataset Overview")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Total Variables", table_stats.get('n_var', 0))
+        with col2:
+            st.metric("Total Observations", f"{table_stats.get('n', 0):,}")
+        with col3:
+            missing_cells = table_stats.get('n_cells_missing', 0)
+            # Calculate total cells properly: rows * columns
+            n_obs = table_stats.get('n', 0)
+            n_vars = table_stats.get('n_var', 0)
+            total_cells = n_obs * n_vars if n_obs > 0 and n_vars > 0 else 1
+            missing_pct = (missing_cells / total_cells) * 100 if total_cells > 0 else 0
+            st.metric("Missing Data", f"{missing_pct:.1f}%")
+        with col4:
+            duplicates = table_stats.get('n_duplicates', 0)
+            duplicate_pct = (duplicates / table_stats.get('n', 1)) * 100 if table_stats.get('n', 0) > 0 else 0
+            st.metric("Duplicate Rows", f"{duplicate_pct:.1f}%")
+        
+        # Variable Types Analysis
+        st.markdown("### 🔢 Variable Types Distribution")
+        types_summary = table_stats.get('types', {})
+        if types_summary:
+            types_df = pd.DataFrame([
+                {"Variable Type": type_name.replace('_', ' ').title(), "Count": count, "Percentage": f"{(count/sum(types_summary.values()))*100:.1f}%"}
+                for type_name, count in types_summary.items()
+            ])
+            st.dataframe(types_df, use_container_width=True, hide_index=True)
+        
+        # Variable Details Analysis
+        st.markdown("### 📋 Variable Analysis")
+        
+        if variables:
+            # Create detailed variable analysis
+            variable_details = []
+            
+            for var_name, var_info in variables.items():
+                var_type = var_info.get('type', 'Unknown')
+                n_missing = var_info.get('n_missing', 0)
+                n_total = var_info.get('n', 0)
+                missing_pct = (n_missing / n_total * 100) if n_total > 0 else 0
+                n_unique = var_info.get('n_unique', 0)
+                
+                # Determine status
+                if missing_pct > 50:
+                    status = "🔴 Critical"
+                elif missing_pct > 20:
+                    status = "🟠 Warning"
+                elif missing_pct > 5:
+                    status = "🟡 Attention"
+                else:
+                    status = "🟢 Good"
+                
+                # Get key statistics based on type
+                key_stats = ""
+                if var_type == "Numeric":
+                    mean_val = var_info.get('mean', 0)
+                    std_val = var_info.get('std', 0)
+                    key_stats = f"Mean: {mean_val:.2f}, Std: {std_val:.2f}" if mean_val and std_val else "Basic stats available"
+                elif var_type == "Categorical":
+                    n_categories = var_info.get('n_distinct', 0)
+                    key_stats = f"{n_categories} categories"
+                elif var_type == "Text":
+                    max_length = var_info.get('max_length', 0)
+                    key_stats = f"Max length: {max_length}" if max_length else "Text analysis available"
+                
+                variable_details.append({
+                    "Variable": var_name,
+                    "Type": var_type,
+                    "Status": status,
+                    "Missing %": f"{missing_pct:.1f}%",
+                    "Unique Values": f"{n_unique:,}",
+                    "Key Statistics": key_stats
+                })
+            
+            # Display variable details table
+            variables_df = pd.DataFrame(variable_details)
+            st.dataframe(variables_df, use_container_width=True, hide_index=True)
+        
+        # Data Quality Issues
+        st.markdown("### ⚠️ Data Quality Assessment")
+        
+        quality_issues = []
+        
+        # Check for high missing data
+        high_missing_vars = [name for name, info in variables.items() 
+                           if (info.get('n_missing', 0) / info.get('n', 1)) > 0.1]
+        if high_missing_vars:
+            quality_issues.append(f"🔸 High missing data in {len(high_missing_vars)} variables: {', '.join(high_missing_vars[:3])}{'...' if len(high_missing_vars) > 3 else ''}")
+        
+        # Check for duplicate rows
+        if duplicate_pct > 5:
+            quality_issues.append(f"🔸 Duplicate rows detected: {duplicate_pct:.1f}% of the dataset")
+        
+        # Check for constant variables
+        constant_vars = [name for name, info in variables.items() 
+                        if info.get('n_distinct', 0) <= 1]
+        if constant_vars:
+            quality_issues.append(f"🔸 Constant variables found: {', '.join(constant_vars)}")
+        
+        if quality_issues:
+            for issue in quality_issues:
+                st.warning(issue)
+        else:
+            st.success("✅ No major data quality issues detected!")
+        
+        # Full HTML Report Option
+        st.markdown("### 📄 Complete Interactive Report")
+        st.info("For the most comprehensive analysis with interactive visualizations, you can generate the full HTML report.")
+        
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            if st.button("🔍 Generate Interactive Report", type="primary", use_container_width=True):
+                with st.spinner("Generating comprehensive HTML report..."):
+                    html_report = profile.to_html()
+                    # Use a larger iframe for better display and remove width restriction
+                    st.components.v1.html(html_report, width=None, height=1200, scrolling=True)
+        
+        with col2:
+            if st.button("💾 Download for Best View", type="secondary", use_container_width=True):
+                html_report = profile.to_html()
+                dataset_name = st.session_state.current_dataset or "dataset"
+                filename = f"data_profile_report_{dataset_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+                st.download_button(
+                    label="📥 Download HTML Report",
+                    data=html_report,
+                    file_name=filename,
+                    mime="text/html",
+                    help="Download for optimal viewing experience",
+                    use_container_width=True
+                )
+        
+    except Exception as e:
+        st.error(f"Error displaying enhanced report: {str(e)}")
+        st.info("Please try the Quick Summary view or download the report for offline viewing.")
+
+def display_export_options(profile):
+    """Provide various export and sharing options"""
+    st.subheader("💾 Export & Share Options")
+    
+    try:
+        # Generate the HTML report
+        html_report = profile.to_html()
+        
+        # Create download button
+        dataset_name = st.session_state.current_dataset or "dataset"
+        filename = f"data_profile_report_{dataset_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+        
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            st.download_button(
+                label="📥 Download Complete HTML Report",
+                data=html_report,
+                file_name=filename,
+                mime="text/html",
+                help="Download the complete profiling report as an HTML file",
+                use_container_width=True
+            )
+        
+        with col2:
+            file_size_mb = len(html_report.encode('utf-8')) / (1024 * 1024)
+            st.metric("Report Size", f"{file_size_mb:.1f} MB")
+        
+        st.success("📄 Report ready for download! The HTML file contains:")
+        
+        features = [
+            "🔍 Interactive data exploration",
+            "📊 Comprehensive statistical analysis", 
+            "📈 Distribution plots and histograms",
+            "🔗 Correlation matrices",
+            "⚠️ Data quality warnings",
+            "📋 Missing data patterns",
+            "🎯 Outlier detection results",
+            "📱 Mobile-responsive design"
+        ]
+        
+        col1, col2 = st.columns(2)
+        for i, feature in enumerate(features):
+            if i % 2 == 0:
+                col1.write(feature)
+            else:
+                col2.write(feature)
+        
+        st.info("💡 **Tip**: Open the downloaded HTML file in your browser for the best viewing experience with full interactivity.")
+        
+    except Exception as e:
+        st.error(f"Error preparing export options: {str(e)}")
     
     # Quality interpretation
     quality_score = report.overall_quality_score
@@ -1230,7 +1435,7 @@ def ai_recommendations_tab(use_llm: bool, api_key: str, model: str):
     if st.session_state.current_dataset:
         st.info(f"🤖 **Analyzing Dataset**: {st.session_state.current_dataset}")
     
-    if not st.session_state.profiling_complete:
+    if not st.session_state.get('ydata_profile'):
         st.warning("⚠️ Please run data profiling first")
         return
     
@@ -1293,7 +1498,7 @@ def generate_recommendations(api_key: str, model: str):
                 analyzer = DataQualityLLMAnalyzer(config)
                 recommendations = analyzer.analyze_data_quality(
                     st.session_state.data,
-                    st.session_state.quality_report
+                    st.session_state.ydata_profile
                 )
                 st.session_state.recommendations = recommendations
         
