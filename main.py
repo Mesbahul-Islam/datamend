@@ -13,7 +13,10 @@ import sys
 import os
 
 # Add src to path for imports
-sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
+# Add parent directory to Python path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
 
 # Import UI modules
 from src.ui.session_state import initialize_session_state
@@ -56,7 +59,7 @@ def main():
         use_llm = st.checkbox("Enable AI Recommendations", value=False)
         if use_llm:
             api_key = st.text_input("LLM API Key", type="password", help="Optional: Enter your LLM API key for AI recommendations")
-            model = st.selectbox("Model", ["gpt-3.5-turbo", "gpt-4", "claude-3-sonnet",], index=0)
+            model = st.selectbox("Model", ["gpt-3.5-turbo", "gpt-4", "claude-3-sonnet","Gemini Flash 2.0"], index=0)
 
     # Create tabs
     tab1, tab2, tab3, tab4 = st.tabs(["📁 Data Source", "📊 Data Profiling", "🎯 Anomaly Detection", "🤖 AI Recommendations"])

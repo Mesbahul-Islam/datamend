@@ -33,13 +33,16 @@ class LLMRecommendation:
 
 @dataclass
 class LLMConfig:
-    """Configuration for LLM API"""
-    api_key: str
-    api_url: str
-    model: str
-    max_tokens: int = 1000
-    temperature: float = 0.3
+    def __init__(self, provider: str, model: str, api_key: str):
+        self.provider = provider
+        self.model = model
+        self.api_key = api_key
+        self.api_url = self._get_api_url()
 
+    def _get_api_url(self):
+        if self.model == "Gemini Flash 2.0":
+            return "https://api.gemini.com/v1/flash"  # Replace with the actual Gemini API URL
+        return "https://api.openai.com/v1/chat/completions"
 
 class DataQualityLLMAnalyzer:
     """
@@ -75,39 +78,6 @@ class DataQualityLLMAnalyzer:
             model=model
         )
     
-    def generate_recommendations(self, quality_report: Dict[str, Any], 
-                               context: str = "credit risk") -> List[LLMRecommendation]:
-        """
-        Generate data quality recommendations based on profiling results.
-        
-        Args:
-            quality_report: Data quality report from the engine
-            context: Domain context for better recommendations
-            
-        Returns:
-            List of LLM-generated recommendations
-        """
-        if not self.config.api_key:
-            logger.warning("No API key configured, returning mock recommendations")
-            return self._generate_mock_recommendations(quality_report)
-        
-        try:
-            # Prepare the prompt for LLM
-            prompt = self._build_analysis_prompt(quality_report, context)
-            
-            # Call LLM API
-            response = self._call_llm_api(prompt)
-            
-            # Parse response into recommendations
-            recommendations = self._parse_llm_response(response)
-            
-            logger.info(f"Generated {len(recommendations)} recommendations from LLM")
-            return recommendations
-            
-        except Exception as e:
-            logger.error(f"Error generating LLM recommendations: {str(e)}")
-            # Fallback to rule-based recommendations
-            return self._generate_fallback_recommendations(quality_report)
     
     def _build_analysis_prompt(self, quality_report: Dict[str, Any], context: str) -> str:
         """
@@ -177,26 +147,17 @@ Provide 3-7 recommendations, prioritizing the most impactful ones.
         return prompt
     
     def _call_llm_api(self, prompt: str) -> str:
-        """
-        Make API call to LLM service.
-        
-        Args:
-            prompt: The prompt to send to the LLM
-            
-        Returns:
-            LLM response text
-        """
         headers = {
             'Authorization': f'Bearer {self.config.api_key}',
             'Content-Type': 'application/json'
         }
-        
+
         data = {
             'model': self.config.model,
             'messages': [
                 {
                     'role': 'system',
-                    'content': 'You are an expert data quality analyst with extensive experience in data governance and quality management.'
+                    'content': 'You are an expert data quality analyst.'
                 },
                 {
                     'role': 'user',
@@ -206,18 +167,20 @@ Provide 3-7 recommendations, prioritizing the most impactful ones.
             'max_tokens': self.config.max_tokens,
             'temperature': self.config.temperature
         }
-        
+
+        if self.config.model == "Gemini Flash 2.0":
+            # Adjust payload or headers for Gemini Flash 2.0 if needed
+            data['special_param'] = "value"  # Example of a Gemini-specific parameter
+
         response = requests.post(
             self.config.api_url,
             headers=headers,
             json=data,
             timeout=30
         )
-        
+
         response.raise_for_status()
-        
-        result = response.json()
-        return result['choices'][0]['message']['content']
+        return response.json()
     
     def _parse_llm_response(self, response: str) -> List[LLMRecommendation]:
         """

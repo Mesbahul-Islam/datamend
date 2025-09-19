@@ -5,7 +5,7 @@ Handles AI-powered data quality recommendations
 
 import streamlit as st
 from typing import Dict, Any
-from llm.analyzer import DataQualityLLMAnalyzer, LLMConfig
+from src.llm.analyzer import DataQualityLLMAnalyzer, LLMConfig
 
 
 def ai_recommendations_tab(use_llm: bool, api_key: str, model: str):
@@ -47,53 +47,28 @@ def generate_recommendations(api_key: str, model: str):
     """Generate AI recommendations"""
     try:
         with st.spinner("🤖 Generating AI recommendations..."):
-            if not api_key:
-                # Use mock recommendations if no API key
-                mock_recommendations = {
-                    "recommendations": [
-                        {
-                            "type": "data_quality",
-                            "priority": "high",
-                            "title": "Address Missing Values",
-                            "description": "Several columns have significant missing values that could impact analysis quality.",
-                            "suggested_actions": [
-                                "Consider imputation strategies for numerical columns",
-                                "Investigate the root cause of missing data",
-                                "Document data collection processes"
-                            ]
-                        },
-                        {
-                            "type": "data_validation",
-                            "priority": "medium", 
-                            "title": "Standardize Data Types",
-                            "description": "Some columns may benefit from consistent data type formatting.",
-                            "suggested_actions": [
-                                "Convert string numbers to numeric types",
-                                "Standardize date formats",
-                                "Review categorical variable encoding"
-                            ]
-                        }
-                    ],
-                    "summary": "Your dataset shows good overall quality with some areas for improvement in completeness and consistency."
-                }
-                st.session_state.recommendations = mock_recommendations
-            else:
-                # Use actual LLM API
-                config = LLMConfig(
-                    provider="openai",
-                    model=model,
-                    api_key=api_key
-                )
-                
-                analyzer = DataQualityLLMAnalyzer(config)
-                recommendations = analyzer.analyze_data_quality(
-                    st.session_state.data,
-                    st.session_state.ydata_profile
-                )
-                st.session_state.recommendations = recommendations
+            config = LLMConfig(
+                provider="openai",
+                model=model,
+                api_key=api_key
+            )
+            analyzer = DataQualityLLMAnalyzer(config)
+            
+            # Build the prompt
+            quality_report = st.session_state.ydata_profile  # Ensure this is the correct data structure
+            context = "general"  # Adjust context as needed
+            prompt = analyzer._build_analysis_prompt(quality_report, context)
+            
+            # Call the LLM API
+            response = analyzer._call_llm_api(prompt)
+            
+            # Parse the response
+            recommendations = analyzer._parse_llm_response(response)
+            
+            # Store recommendations in session state
+            st.session_state.recommendations = recommendations
         
         st.success("✅ AI recommendations generated successfully!")
-        
     except Exception as e:
         st.error(f"❌ Error generating recommendations: {str(e)}")
 

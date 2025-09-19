@@ -10,8 +10,8 @@ import sys
 # Add src to path for imports
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from connectors.data_connectors import DataConnectorFactory
-from ui.components import show_data_preview, display_loading_info, create_file_upload_section
+from src.connectors.data_connectors import DataConnectorFactory
+from src.ui.components import show_data_preview, display_loading_info, create_file_upload_section
 
 
 def data_source_tab():
