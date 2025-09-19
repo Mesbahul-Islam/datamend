@@ -1,0 +1,9 @@
+[server]
+# Remove file upload size limitation
+# Set to a very large value (10GB) to effectively remove the limit
+maxUploadSize = 10240
+
+
+[browser]
+# Disable usage stats collection
+gatherUsageStats = false

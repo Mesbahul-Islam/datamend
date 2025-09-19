@@ -4,6 +4,7 @@ Data Connectors Module
 This module provides simple data connectors for basic data sources:
 - CSV files
 - Excel files
+- Snowflake database
 """
 
 import pandas as pd
@@ -12,6 +13,13 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 import os
+
+try:
+    import snowflake.connector
+    from snowflake.connector.pandas_tools import pd_writer
+    SNOWFLAKE_AVAILABLE = True
+except ImportError:
+    SNOWFLAKE_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -237,6 +245,174 @@ class ExcelConnector(DataConnector):
             return DataSourceInfo(source_type="excel", file_path=self.file_path)
 
 
+class SnowflakeConnector(DataConnector):
+    """Snowflake Database Connector"""
+    
+    def __init__(self, account: str, username: str, password: str, 
+                 warehouse: str, database: str, schema: str = "PUBLIC"):
+        super().__init__()
+        if not SNOWFLAKE_AVAILABLE:
+            raise ImportError("Snowflake connector not available. Install snowflake-connector-python")
+        
+        self.account = account
+        self.username = username
+        self.password = password
+        self.warehouse = warehouse
+        self.database = database
+        self.schema = schema
+        self.connection = None
+        self.tables_cache = None
+        logger.info(f"Snowflake Connector initialized for account: {account}")
+    
+    def connect(self) -> bool:
+        """Connect to Snowflake"""
+        try:
+            self.connection = snowflake.connector.connect(
+                account=self.account,
+                user=self.username,
+                password=self.password,
+                warehouse=self.warehouse,
+                database=self.database,
+                schema=self.schema
+            )
+            
+            # Test connection
+            cursor = self.connection.cursor()
+            cursor.execute("SELECT CURRENT_VERSION()")
+            version = cursor.fetchone()
+            cursor.close()
+            
+            self.is_connected = True
+            logger.info(f"Successfully connected to Snowflake. Version: {version[0]}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to connect to Snowflake: {str(e)}")
+            self.is_connected = False
+            return False
+    
+    def get_data(self, query: str = None, limit: int = None) -> pd.DataFrame:
+        """
+        Execute SQL query and return results as DataFrame.
+        
+        Args:
+            query: SQL query to execute
+            limit: Maximum number of rows to return
+            
+        Returns:
+            DataFrame with query results
+        """
+        if not self.is_connected:
+            raise RuntimeError("Not connected to Snowflake")
+        
+        if not query:
+            raise ValueError("Query is required for Snowflake connector")
+        
+        try:
+            # Add LIMIT clause if specified
+            if limit and "LIMIT" not in query.upper():
+                query = f"{query.rstrip(';')} LIMIT {limit}"
+            
+            cursor = self.connection.cursor()
+            cursor.execute(query)
+            
+            # Fetch column names
+            columns = [desc[0] for desc in cursor.description]
+            
+            # Fetch data
+            data = cursor.fetchall()
+            cursor.close()
+            
+            # Create DataFrame
+            df = pd.DataFrame(data, columns=columns)
+            logger.info(f"Loaded {len(df)} rows from Snowflake query")
+            return df
+            
+        except Exception as e:
+            logger.error(f"Error executing Snowflake query: {str(e)}")
+            raise
+    
+    def get_tables(self) -> List[str]:
+        """Get list of available tables in the current schema"""
+        if not self.is_connected:
+            return []
+        
+        if self.tables_cache is not None:
+            return self.tables_cache
+        
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute(f"""
+                SELECT TABLE_NAME 
+                FROM INFORMATION_SCHEMA.TABLES 
+                WHERE TABLE_SCHEMA = '{self.schema}' 
+                AND TABLE_TYPE = 'BASE TABLE'
+                ORDER BY TABLE_NAME
+            """)
+            
+            tables = [row[0] for row in cursor.fetchall()]
+            cursor.close()
+            
+            self.tables_cache = tables
+            logger.info(f"Found {len(tables)} tables in schema {self.schema}")
+            return tables
+            
+        except Exception as e:
+            logger.error(f"Error getting Snowflake tables: {str(e)}")
+            return []
+    
+    def get_info(self) -> DataSourceInfo:
+        """Get information about the Snowflake connection"""
+        return DataSourceInfo(
+            source_type="snowflake",
+            file_path=f"{self.account}/{self.database}/{self.schema}"
+        )
+    
+    def get_table_info(self, table_name: str) -> Dict[str, Any]:
+        """Get detailed information about a specific table"""
+        if not self.is_connected:
+            return {}
+        
+        try:
+            cursor = self.connection.cursor()
+            
+            # Get column information
+            cursor.execute(f"""
+                SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE
+                FROM INFORMATION_SCHEMA.COLUMNS 
+                WHERE TABLE_SCHEMA = '{self.schema}' 
+                AND TABLE_NAME = '{table_name}'
+                ORDER BY ORDINAL_POSITION
+            """)
+            
+            columns_info = cursor.fetchall()
+            
+            # Get row count
+            cursor.execute(f'SELECT COUNT(*) FROM "{self.schema}"."{table_name}"')
+            row_count = cursor.fetchone()[0]
+            
+            cursor.close()
+            
+            return {
+                'table_name': table_name,
+                'row_count': row_count,
+                'column_count': len(columns_info),
+                'columns': [col[0] for col in columns_info],
+                'column_types': {col[0]: col[1] for col in columns_info}
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting table info for {table_name}: {str(e)}")
+            return {}
+    
+    def close(self):
+        """Close the Snowflake connection"""
+        if self.connection:
+            self.connection.close()
+            self.is_connected = False
+            logger.info("Snowflake connection closed")
+
+
 class DataConnectorFactory:
     """Factory class for creating data connectors"""
     
@@ -246,7 +422,7 @@ class DataConnectorFactory:
         Create a data connector based on the source type.
         
         Args:
-            source_type: Type of data source ('csv', 'excel')
+            source_type: Type of data source ('csv', 'excel', 'snowflake')
             **kwargs: Additional parameters for the connector
             
         Returns:
@@ -273,10 +449,28 @@ class DataConnectorFactory:
                 sheet_name=kwargs.get('sheet_name')
             )
         
+        elif source_type == 'snowflake':
+            required_params = ['account', 'username', 'password', 'warehouse', 'database']
+            for param in required_params:
+                if not kwargs.get(param):
+                    raise ValueError(f"{param} is required for Snowflake connector")
+            
+            return SnowflakeConnector(
+                account=kwargs['account'],
+                username=kwargs['username'],
+                password=kwargs['password'],
+                warehouse=kwargs['warehouse'],
+                database=kwargs['database'],
+                schema=kwargs.get('schema', 'PUBLIC')
+            )
+        
         else:
             raise ValueError(f"Unsupported source type: {source_type}")
     
     @staticmethod
     def get_supported_types() -> List[str]:
         """Get list of supported data source types"""
-        return ['csv', 'excel']
+        types = ['csv', 'excel']
+        if SNOWFLAKE_AVAILABLE:
+            types.append('snowflake')
+        return types

@@ -81,26 +81,7 @@ def display_ydata_profiling_results(profile):
     
     # Executive Summary from ydata-profiling
     st.subheader("📈 Data Profiling Report")
-    
-    # Display profiling time if available
-    if hasattr(st.session_state, 'profiling_time') and st.session_state.profiling_time:
-        profiling_time = st.session_state.profiling_time
-        if profiling_time < 1:
-            time_display = f"{profiling_time*1000:.0f}ms"
-            time_status = "⚡ Fast"
-        elif profiling_time < 5:
-            time_display = f"{profiling_time:.2f}s"
-            time_status = "🟢 Quick"
-        elif profiling_time < 15:
-            time_display = f"{profiling_time:.1f}s"
-            time_status = "🟡 Normal"
-        else:
-            time_display = f"{profiling_time:.1f}s"
-            time_status = "🟠 Slow"
-        st.info(f"**Profiling Time**: {time_display} ({time_status})")
-    
-    # Display options
-    st.subheader("📊 Report Display Options")
+
     
     # Create tabs for different views
     tab1, tab2, tab3 = st.tabs(["📋 Quick Summary", "📄 Detailed Report", "💾 Export Options"])
@@ -227,8 +208,7 @@ def download_html_report(profile):
 
 def display_enhanced_report(profile):
     """Display an enhanced report with better formatting"""
-    st.subheader("📊 Detailed Data Analysis")
-    
+
     try:
         # Get description for detailed analysis
         description = profile.description_set

@@ -10,23 +10,7 @@ def show_data_preview(df: pd.DataFrame):
     """Show a preview of the loaded data"""
     st.subheader("📄 Data Preview")
     
-    # Dataset information
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.metric("Rows", f"{len(df):,}")
-    
-    with col2:
-        st.metric("Columns", len(df.columns))
-    
-    with col3:
-        memory_usage = df.memory_usage(deep=True).sum() / 1024 / 1024
-        st.metric("Memory Usage", f"{memory_usage:.1f} MB")
-    
-    # Sample data
-    st.write("**First 10 rows:**")
-    st.dataframe(df.head(10), use_container_width=True)
-    
+
     # Column information
     st.write("**Column Information:**")
     column_info = []
