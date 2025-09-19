@@ -1,0 +1,20 @@
+# Core dependencies for data quality engine
+pandas>=2.0.0
+numpy>=1.24.0
+streamlit>=1.28.0
+
+# Database connectors
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.0
+
+# HTTP requests for LLM API
+requests>=2.31.0
+
+# Statistics and data analysis
+scipy>=1.11.0
+
+# Configuration management
+python-dotenv>=1.0.0
+
+# Visualization
+plotly>=5.0.0
