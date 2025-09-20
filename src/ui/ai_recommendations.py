@@ -11,27 +11,27 @@ from src.llm.analyzer import DataQualityLLMAnalyzer, LLMConfig
 
 def ai_recommendations_tab(use_llm: bool, api_key: str, model: str, provider: str = "openai"):
     """AI recommendations tab"""
-    st.header("🤖 AI Recommendations")
+    st.header("AI Recommendations")
     
     if not use_llm:
-        st.info("💡 Enable AI Recommendations in the sidebar to get intelligent suggestions")
+        st.info("Enable AI Recommendations in the sidebar to get intelligent suggestions")
         return
     
     if st.session_state.data is None:
-        st.warning("⚠️ Please load data first in the Data Source tab")
+        st.warning("🟡 Please load data first in the Data Source tab")
         return
     
     # Show current dataset info
     if st.session_state.current_dataset:
-        st.info(f"🤖 **Analyzing Dataset**: {st.session_state.current_dataset}")
+        st.info(f"Analyzing Dataset: {st.session_state.current_dataset}")
     
     if not st.session_state.get('ydata_profile'):
-        st.warning("⚠️ Please run data profiling first")
+        st.warning("🟡 Please run data profiling first")
         return
     
     # Show current LLM configuration
-    provider_display = "🔥 Google Gemini" if provider == "google gemini" else "🤖 OpenAI"
-    st.info(f"**LLM Provider**: {provider_display} | **Model**: {model}")
+    provider_display = "Google Gemini" if provider == "google gemini" else "OpenAI"
+    st.info(f"LLM Provider: {provider_display} | Model: {model}")
     
     # Recommendations controls
     col1, col2 = st.columns([3, 1])
@@ -40,7 +40,7 @@ def ai_recommendations_tab(use_llm: bool, api_key: str, model: str, provider: st
         st.write("Generate AI-powered recommendations based on your data quality analysis")
     
     with col2:
-        if st.button("🤖 Get Recommendations", type="primary", key="get_recommendations_button"):
+        if st.button("Get Recommendations", type="primary", key="get_recommendations_button"):
             generate_recommendations(api_key, model, provider)
     
     # Show recommendations if available
@@ -49,14 +49,14 @@ def ai_recommendations_tab(use_llm: bool, api_key: str, model: str, provider: st
     else:
         # Debug: Show if recommendations exist but are empty
         if 'recommendations' in st.session_state:
-            st.warning("⚠️ Recommendations were generated but appear to be empty")
+            st.warning("🟡 Recommendations were generated but appear to be empty")
             st.write("Debug info:", st.session_state.recommendations)
 
 
 def generate_recommendations(api_key: str, model: str, provider: str = "openai"):
     """Generate AI recommendations"""
     try:
-        with st.spinner("🤖 Generating AI recommendations..."):
+        with st.spinner("Generating AI recommendations..."):
             config = LLMConfig(
                 provider=provider,
                 model=model,
@@ -81,20 +81,20 @@ def generate_recommendations(api_key: str, model: str, provider: str = "openai")
             # Store recommendations in session state
             st.session_state.recommendations = recommendations
         
-        st.success("✅ AI recommendations generated successfully!")
+        st.success("🟢 AI recommendations generated successfully!")
     except Exception as e:
-        st.error(f"❌ Error generating recommendations: {str(e)}")
+        st.error(f"🔴 Error generating recommendations: {str(e)}")
         
         # Provide helpful error messages
         if "api_key" in str(e).lower():
             if provider == "google gemini":
-                st.info("💡 **Tip**: Get your Google AI API key from https://aistudio.google.com/app/apikey")
+                st.info("Tip: Get your Google AI API key from https://aistudio.google.com/app/apikey")
             else:
-                st.info("💡 **Tip**: Check your OpenAI API key and ensure it has sufficient credits")
+                st.info("Tip: Check your OpenAI API key and ensure it has sufficient credits")
         elif "quota" in str(e).lower() or "rate" in str(e).lower():
-            st.info("💡 **Tip**: You may have hit API rate limits. Try again in a few moments")
+            st.info("Tip: You may have hit API rate limits. Try again in a few moments")
         elif "network" in str(e).lower() or "timeout" in str(e).lower():
-            st.info("💡 **Tip**: Network issue. Check your internet connection and try again")
+            st.info("Tip: Network issue. Check your internet connection and try again")
 
 
 def display_recommendations(recommendations: Dict[str, Any]):

@@ -11,7 +11,6 @@ A modular data quality management interface focused on:
 import streamlit as st
 import sys
 import os
-import oracledb
 
 
 # Add src to path for imports
@@ -30,8 +29,7 @@ from src.ui.data_source import (
 )
 from src.ui.data_profiling import data_profiling_tab
 from src.ui.anomaly_detection import anomaly_detection_tab
-from src.ui.ai_recommendations import ai_recommendations_tab
-from src.ui.data_comparison import data_comparison_tab
+from src.ui.data_lineage import data_lineage_tab
 
 # Configure Streamlit page
 st.set_page_config(
@@ -40,28 +38,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-def handle_sidebar_oracle_connection():
-    st.subheader("Oracle Cloud Connection")
-    username = st.text_input("Username", help="Enter your Oracle Cloud username")
-    password = st.text_input("Password", type="password", help="Enter your Oracle Cloud password")
-    host = st.text_input("Host", help="Enter your Oracle Cloud host")
-    port = st.text_input("Port", value="1521", help="Enter your Oracle Cloud port")
-    service_name = st.text_input("Service Name", help="Enter your Oracle Cloud service name")
-
-    if st.button("Connect to Oracle Cloud"):
-        try:
-            # Create a connection to Oracle Cloud
-            dsn = f"{host}:{port}/{service_name}"
-            connection = oracledb.connect(user=username, password=password, dsn=dsn)
-            st.session_state['oracle_connection'] = connection
-            st.success("Connected to Oracle Cloud successfully!")
-        except Exception as e:
-            st.error(f"Failed to connect to Oracle Cloud: {e}")
-
 def main():
     """Main application function"""
     st.title("DataMend - Data Quality Management")
-    st.markdown("---")
     
     # Initialize session state
     initialize_session_state()
@@ -75,11 +54,10 @@ def main():
             st.success("Snowflake Connected")
         
         # Data source selection
-        # Data source selection
         st.subheader("Select Data Source")
         source_type = st.selectbox(
             "Choose data source type:",
-            ["CSV Files", "Excel Files", "Snowflake Database", "Oracle Cloud"],
+            ["CSV Files", "Excel Files", "Snowflake Database"],
             help="Select the type of data you want to upload"
         )
         
@@ -90,8 +68,6 @@ def main():
             handle_sidebar_excel_upload()
         elif source_type == "Snowflake Database":
             handle_sidebar_snowflake_connection()
-        elif source_type == "Oracle Cloud":
-            handle_sidebar_oracle_connection()
         
         # Configuration section
         st.markdown("---")
@@ -120,7 +96,7 @@ def main():
         if use_llm:
             if auto_configured:
                 # Show current auto-configuration with option to override
-                st.success(f"✅ Auto-configured with {env_config.provider.upper()} from environment")
+                st.success(f"Auto-configured with {env_config.provider.upper()} from environment")
                 
                 # Option to use custom settings instead
                 use_custom = st.checkbox("Use custom API settings", value=False, 
@@ -243,30 +219,50 @@ def main():
                         'api_key': api_key
                     }
 
-    # Create tabs for analysis
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Data Overview", "Data Profiling", "Anomaly Detection", "Data Comparison", "AI Recommendations"])
+    # User guidance section
+    if st.session_state.data is not None:
+        st.success(f"Dataset loaded: {st.session_state.current_dataset}")
+        lineage_text = "\n4. **Data Lineage** - Visualize Snowflake data dependencies with AI insights" if st.session_state.get('data_source') == 'snowflake' else ""
+        
+        st.info("**Quick Start Guide:**\n"
+                "1. **Data Overview** - Basic dataset information\n"
+                "2. **Data Profiling** - Comprehensive analysis with AI insights\n"
+                "   • Quick Summary | Detailed Report | Statistical Outliers | Analytics Quality\n"
+                "   • Get AI-powered recommendations after profiling\n"
+                "3. **Statistical Outliers** - View outlier results with AI explanations" + lineage_text + "\n\n"
+                "💡 **AI Recommendations** are now integrated into each analysis stage!")
+    else:
+        st.warning("Please load a dataset using the sidebar to get started.")
+
+    # Create tabs for analysis (conditionally include Data Lineage for Snowflake)
+    tab_names = [
+        "Data Overview", 
+        "Data Profiling", 
+        "Statistical Outliers"
+    ]
     
-    with tab1:
+    # Add Data Lineage tab if data source is Snowflake
+    if st.session_state.get('data_source') == 'snowflake':
+        tab_names.append("Data Lineage")
+    
+    tabs = st.tabs(tab_names)
+    
+    # Data Overview tab
+    with tabs[0]:
         data_overview_tab()
     
-    with tab2:
+    # Data Profiling tab  
+    with tabs[1]:
         data_profiling_tab(anomaly_threshold)
     
-    with tab3:
+    # Statistical Outliers tab
+    with tabs[2]:
         anomaly_detection_tab(anomaly_threshold)
     
-    with tab4:
-        data_comparison_tab()
-    
-    with tab5:
-        # Get LLM configuration from session state
-        llm_config = st.session_state.get('llm_auto_config', {})
-        ai_recommendations_tab(
-            use_llm, 
-            llm_config.get('api_key', ""), 
-            llm_config.get('model', "gemini-2.0-flash"),
-            llm_config.get('provider', "gemini")
-        )
+    # Data Lineage tab (only for Snowflake)
+    if st.session_state.get('data_source') == 'snowflake':
+        with tabs[3]:
+            data_lineage_tab()
 
 
 if __name__ == "__main__":

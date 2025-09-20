@@ -8,11 +8,11 @@ import pandas as pd
 
 def show_data_preview(df: pd.DataFrame):
     """Show a preview of the loaded data"""
-    st.subheader("📄 Data Preview")
+    st.subheader("Data Preview")
     
 
     # Column information
-    st.write("**Column Information:**")
+    st.write("Column Information:")
     column_info = []
     for col in df.columns:
         col_info = {
@@ -25,7 +25,7 @@ def show_data_preview(df: pd.DataFrame):
         column_info.append(col_info)
     
     column_df = pd.DataFrame(column_info)
-    st.dataframe(column_df, use_container_width=True, hide_index=True)
+    st.dataframe(column_df, width='stretch', hide_index=True)
 
 
 def display_loading_info(df: pd.DataFrame, processing_time: float = None):
@@ -35,19 +35,19 @@ def display_loading_info(df: pd.DataFrame, processing_time: float = None):
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.success(f"✅ **Data loaded successfully!**")
-        st.write(f"📊 **Shape**: {len(df):,} rows × {len(df.columns)} columns")
+        st.success(f"🟢 Data loaded successfully!")
+        st.write(f"Shape: {len(df):,} rows × {len(df.columns)} columns")
         
     with col2:
-        st.write(f"💾 **Size**: {dataset_size_mb:.1f} MB")
+        st.write(f"Size: {dataset_size_mb:.1f} MB")
         if processing_time:
-            st.write(f"⏱️ **Load time**: {processing_time:.2f}s")
+            st.write(f"Load time: {processing_time:.2f}s")
             
     with col3:
         missing_cells = df.isnull().sum().sum()
         total_cells = len(df) * len(df.columns)
         missing_pct = (missing_cells / total_cells) * 100 if total_cells > 0 else 0
-        st.write(f"❓ **Missing data**: {missing_pct:.1f}%")
+        st.write(f"Missing data: {missing_pct:.1f}%")
 
 
 def create_file_upload_section(key_suffix: str = ""):
@@ -61,10 +61,10 @@ def create_file_upload_section(key_suffix: str = ""):
     )
     
     if uploaded_files:
-        st.success(f"📁 {len(uploaded_files)} file(s) selected")
+        st.success(f"� {len(uploaded_files)} file(s) selected")
         
         # File upload configuration
-        st.subheader("📋 Upload Configuration")
+        st.subheader("Upload Configuration")
         
         col1, col2, col3 = st.columns(3)
         

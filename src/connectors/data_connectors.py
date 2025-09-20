@@ -67,63 +67,6 @@ class DataConnector(ABC):
         """Get information about the data source"""
         return DataSourceInfo(source_type="unknown")
 
-class OracleCloudConnector(DataConnector):
-    """Oracle Cloud Database Connector"""
-    def __init__(self, username: str, password: str, dsn: str, 
-                 wallet_location: str = None):
-        super().__init__()
-        self.username = username
-        self.password = password
-        self.dsn = dsn
-        self.wallet_location = wallet_location
-        self.connection = None
-        
-    def connect(self) -> bool:
-        """Connect to Oracle Cloud"""
-        try:
-            import oracledb
-            if self.wallet_location:
-                oracledb.init_oracle_client(config_dir=self.wallet_location)
-            
-            self.connection = oracledb.connect(
-                user=self.username,
-                password=self.password,
-                dsn=self.dsn
-            )
-            return True
-        except Exception as e:
-            logger.error(f"Oracle connection failed: {str(e)}")
-            return False
-            
-    def get_data(self, query: str = None, limit: int = None) -> pd.DataFrame:
-        """Execute query and return results"""
-        try:
-            if query is None:
-                return pd.DataFrame()
-                
-            if limit:
-                query = self._add_row_limit(query, limit)
-                
-            return pd.read_sql(query, self.connection)
-        except Exception as e:
-            logger.error(f"Oracle query failed: {str(e)}")
-            return pd.DataFrame()
-            
-    def get_tables(self) -> List[str]:
-        """Get list of accessible tables"""
-        query = """
-        SELECT table_name 
-        FROM user_tables 
-        ORDER BY table_name
-        """
-        df = self.get_data(query)
-        return df['TABLE_NAME'].tolist() if not df.empty else []
-
-    def close(self):
-        """Close Oracle connection"""
-        if self.connection:
-            self.connection.close()
-
 class CSVConnector(DataConnector):
     """CSV File Connector"""
     
