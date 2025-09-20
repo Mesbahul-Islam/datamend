@@ -75,19 +75,41 @@ class DataQualityLLMAnalyzer:
     
     def _load_config_from_env(self) -> LLMConfig:
         """Load LLM configuration from environment variables"""
+        # Try multiple environment variable names for API key
         api_key = os.getenv('LLM_API_KEY', '')
-        provider = os.getenv('LLM_PROVIDER', 'openai').lower().replace(" ", "").replace("-", "")
+        provider = os.getenv('LLM_PROVIDER', '').lower().replace(" ", "").replace("-", "")
+        
+        # If no LLM_API_KEY, try standard environment variables and auto-detect provider
+        if not api_key:
+            # Prioritize Gemini/Google AI keys first (since we default to Gemini)
+            if os.getenv('GOOGLE_AI_API_KEY') or os.getenv('GEMINI_API_KEY'):
+                api_key = os.getenv('GOOGLE_AI_API_KEY') or os.getenv('GEMINI_API_KEY')
+                provider = 'gemini'
+            elif os.getenv('OPENAI_API_KEY'):
+                api_key = os.getenv('OPENAI_API_KEY')
+                provider = 'openai'
+        
+        # If still no provider specified, default to gemini
+        if not provider:
+            provider = 'gemini'
         
         # Set default models based on provider
         if provider in ["gemini", "googlegemini", "google"]:
-            default_model = 'gemini-1.5-flash'
+            default_model = 'gemini-2.0-flash'
         else:
             default_model = 'gpt-3.5-turbo'
             
+        # Use environment model or default based on detected provider
         model = os.getenv('LLM_MODEL', default_model)
         
+        # If LLM_MODEL is not set and we auto-detected provider, use the correct default
+        if not os.getenv('LLM_MODEL'):
+            model = default_model
+        
         if not api_key:
-            logger.warning("LLM_API_KEY not found in environment variables")
+            logger.warning("No API key found in environment variables (tried LLM_API_KEY, GOOGLE_AI_API_KEY, GEMINI_API_KEY, OPENAI_API_KEY)")
+        else:
+            logger.info(f"API key loaded from environment for provider: {provider}")
         
         return LLMConfig(
             provider=provider,

@@ -6,6 +6,7 @@ import streamlit as st
 import pandas as pd
 import os
 import sys
+from datetime import datetime
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -120,9 +121,15 @@ def load_csv_files(uploaded_files, encoding, delimiter, sample_rows):
                 if connector.connect():
                     df = connector.get_data(limit=sample_rows)
                     
-                    # Store in datasets
+                    # Store in datasets with source type information
                     dataset_name = uploaded_file.name
-                    st.session_state.datasets[dataset_name] = df
+                    st.session_state.datasets[dataset_name] = {
+                        'dataframe': df,
+                        'source_type': 'csv',
+                        'upload_time': datetime.now(),
+                        'file_size': uploaded_file.size,
+                        'file_name': uploaded_file.name
+                    }
                     st.session_state.connectors[dataset_name] = connector
                     
                     # Set first file as current dataset
@@ -202,9 +209,15 @@ def load_single_csv_file(uploaded_file, encoding, delimiter, sample_rows):
                 st.session_state.data = df
                 st.session_state.connector = connector
                 
-                # Also store in datasets for multi-file support
+                # Also store in datasets for multi-file support with source type information
                 dataset_name = uploaded_file.name
-                st.session_state.datasets[dataset_name] = df
+                st.session_state.datasets[dataset_name] = {
+                    'dataframe': df,
+                    'source_type': 'excel',
+                    'upload_time': datetime.now(),
+                    'file_size': uploaded_file.size,
+                    'file_name': uploaded_file.name
+                }
                 st.session_state.connectors[dataset_name] = connector
                 st.session_state.current_dataset = dataset_name
                 
@@ -292,9 +305,15 @@ def load_multiple_csv_files(uploaded_files, encoding, delimiter, sample_rows):
             if connector.connect():
                 df = connector.get_data(limit=sample_rows)
                 
-                # Store in datasets
+                # Store in datasets with source type information
                 dataset_name = uploaded_file.name
-                st.session_state.datasets[dataset_name] = df
+                st.session_state.datasets[dataset_name] = {
+                    'dataframe': df,
+                    'source_type': 'csv',
+                    'upload_time': datetime.now(),
+                    'file_size': uploaded_file.size,
+                    'file_name': uploaded_file.name
+                }
                 st.session_state.connectors[dataset_name] = connector
                 
                 # Set first file as current dataset for backward compatibility
@@ -511,9 +530,16 @@ def handle_excel_upload():
                         if connector.connect():
                             df = connector.get_data(limit=sample_rows)
                             
-                            # Store in session state
+                            # Store in session state with source type information
                             dataset_name = f"{uploaded_file.name}_{selected_sheet}"
-                            st.session_state.datasets[dataset_name] = df
+                            st.session_state.datasets[dataset_name] = {
+                                'dataframe': df,
+                                'source_type': 'excel',
+                                'upload_time': datetime.now(),
+                                'file_size': uploaded_file.size,
+                                'file_name': uploaded_file.name,
+                                'sheet_name': selected_sheet
+                            }
                             st.session_state.connectors[dataset_name] = connector
                             st.session_state.current_dataset = dataset_name
                             st.session_state.data = df
@@ -767,8 +793,16 @@ def load_snowflake_data(connector, query, table_name=None):
             if 'datasets' not in st.session_state:
                 st.session_state.datasets = {}
             
-            # Store DataFrame directly (consistent with CSV/Excel handling)
-            st.session_state.datasets[dataset_name] = df
+            # Store DataFrame with source type information
+            st.session_state.datasets[dataset_name] = {
+                'dataframe': df,
+                'source_type': 'snowflake',
+                'load_time': datetime.now(),
+                'table_name': table_name if table_name else 'custom_query',
+                'query': query,
+                'row_count': len(df),
+                'column_count': len(df.columns)
+            }
             st.session_state.connectors[dataset_name] = st.session_state.snowflake_connector
             
             # Set as current dataset
@@ -860,9 +894,16 @@ def handle_sidebar_excel_upload():
                         if connector.connect():
                             df = connector.get_data(limit=sample_rows)
                             
-                            # Store in session state
+                            # Store in session state with source type information
                             dataset_name = f"{uploaded_file.name}_{selected_sheet}"
-                            st.session_state.datasets[dataset_name] = df
+                            st.session_state.datasets[dataset_name] = {
+                                'dataframe': df,
+                                'source_type': 'excel',
+                                'upload_time': datetime.now(),
+                                'file_size': uploaded_file.size,
+                                'file_name': uploaded_file.name,
+                                'sheet_name': selected_sheet
+                            }
                             st.session_state.connectors[dataset_name] = connector
                             st.session_state.current_dataset = dataset_name
                             st.session_state.data = df

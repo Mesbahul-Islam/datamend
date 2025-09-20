@@ -29,11 +29,11 @@ from src.ui.data_source import (
 from src.ui.data_profiling import data_profiling_tab
 from src.ui.anomaly_detection import anomaly_detection_tab
 from src.ui.ai_recommendations import ai_recommendations_tab
+from src.ui.data_comparison import data_comparison_tab
 
 # Configure Streamlit page
 st.set_page_config(
-    page_title="Data Quality Engine",
-    page_icon="🔍",
+    page_title="DataMend",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -41,7 +41,7 @@ st.set_page_config(
 
 def main():
     """Main application function"""
-    st.title("Data Quality Engine")
+    st.title("DataMend - Data Quality Management")
     st.markdown("---")
     
     # Initialize session state
@@ -81,41 +81,148 @@ def main():
         
         # LLM configuration
         st.subheader("AI Recommendations")
-        use_llm = st.checkbox("Enable AI Recommendations", value=False)
+        
+        # Try to automatically configure from environment
+        try:
+            from src.llm.analyzer import DataQualityLLMAnalyzer
+            analyzer = DataQualityLLMAnalyzer()
+            env_config = analyzer._load_config_from_env()
+            auto_configured = bool(env_config.api_key)
+        except Exception:
+            auto_configured = False
+            env_config = None
+        
+        # Enable by default if API key is available in environment
+        use_llm = st.checkbox("Enable AI Recommendations", value=auto_configured)
+        
         if use_llm:
-            provider = st.selectbox(
-                "LLM Provider", 
-                ["OpenAI", "Google Gemini"], 
-                index=0,
-                help="Choose your preferred LLM provider"
-            )
-            
-            if provider == "OpenAI":
-                api_key = st.text_input(
-                    "OpenAI API Key", 
-                    type="password", 
-                    help="Enter your OpenAI API key"
-                )
-                model = st.selectbox(
-                    "Model", 
-                    ["gpt-3.5-turbo", "gpt-4", "gpt-4-turbo"], 
-                    index=0
-                )
-            else:  # Google Gemini
-                api_key = st.text_input(
-                    "Google AI API Key", 
-                    type="password", 
-                    help="Enter your Google AI Studio API key"
-                )
-                model = st.selectbox(
-                    "Model", 
-                    ["gemini-2.0-flash", "gemini-2.0-pro"], 
-                    index=0,
-                    help="Gemini models available through Google AI"
-                )
+            if auto_configured:
+                # Show current auto-configuration with option to override
+                st.success(f"✅ Auto-configured with {env_config.provider.upper()} from environment")
+                
+                # Option to use custom settings instead
+                use_custom = st.checkbox("Use custom API settings", value=False, 
+                                       help="Check this to override the environment configuration")
+                
+                if not use_custom:
+                    # Use environment configuration
+                    st.info(f"**Provider:** {env_config.provider.upper()} | **Model:** {env_config.model}")
+                    st.session_state['llm_auto_config'] = {
+                        'provider': env_config.provider,
+                        'model': env_config.model,
+                        'api_key': env_config.api_key
+                    }
+                else:
+                    # Show custom configuration options - inline implementation
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        provider = st.selectbox(
+                            "LLM Provider", 
+                            ["Google Gemini", "OpenAI"], 
+                            index=0,  # Default to Gemini
+                            help="Choose your preferred LLM provider",
+                            key="custom_provider"
+                        )
+                    
+                    with col2:
+                        if provider == "OpenAI":
+                            model_options = ["gpt-3.5-turbo", "gpt-4", "gpt-4-turbo"]
+                            default_model = "gpt-3.5-turbo"
+                            provider_key = "openai"
+                        else:  # Google Gemini
+                            model_options = ["gemini-2.0-flash", "gemini-2.0-pro", "gemini-1.5-flash"]
+                            default_model = "gemini-2.0-flash"
+                            provider_key = "gemini"
+                        
+                        model = st.selectbox("Model", model_options, 
+                                           index=model_options.index(default_model),
+                                           key="custom_model")
+                    
+                    # API Key input
+                    if provider == "OpenAI":
+                        env_api_key = os.getenv("OPENAI_API_KEY", "")
+                        api_key = st.text_input(
+                            "OpenAI API Key", 
+                            value=env_api_key,
+                            type="password", 
+                            help="Enter your OpenAI API key",
+                            key="custom_openai_key"
+                        )
+                    else:  # Google Gemini
+                        env_api_key = os.getenv("GOOGLE_AI_API_KEY", "") or os.getenv("GEMINI_API_KEY", "")
+                        api_key = st.text_input(
+                            "Google AI API Key", 
+                            value=env_api_key,
+                            type="password", 
+                            help="Enter your Google AI Studio API key",
+                            key="custom_gemini_key"
+                        )
+                    
+                    # Store custom configuration
+                    if api_key:
+                        st.session_state['llm_auto_config'] = {
+                            'provider': provider_key,
+                            'model': model,
+                            'api_key': api_key
+                        }
+            else:
+                # No environment config available, show manual configuration
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    provider = st.selectbox(
+                        "LLM Provider", 
+                        ["Google Gemini", "OpenAI"], 
+                        index=0,  # Default to Gemini
+                        help="Choose your preferred LLM provider",
+                        key="manual_provider"
+                    )
+                
+                with col2:
+                    if provider == "OpenAI":
+                        model_options = ["gpt-3.5-turbo", "gpt-4", "gpt-4-turbo"]
+                        default_model = "gpt-3.5-turbo"
+                        provider_key = "openai"
+                    else:  # Google Gemini
+                        model_options = ["gemini-2.0-flash", "gemini-2.0-pro", "gemini-1.5-flash"]
+                        default_model = "gemini-2.0-flash"
+                        provider_key = "gemini"
+                    
+                    model = st.selectbox("Model", model_options, 
+                                       index=model_options.index(default_model),
+                                       key="manual_model")
+                
+                # API Key input
+                if provider == "OpenAI":
+                    env_api_key = os.getenv("OPENAI_API_KEY", "")
+                    api_key = st.text_input(
+                        "OpenAI API Key", 
+                        value=env_api_key,
+                        type="password", 
+                        help="Enter your OpenAI API key",
+                        key="manual_openai_key"
+                    )
+                else:  # Google Gemini
+                    env_api_key = os.getenv("GOOGLE_AI_API_KEY", "") or os.getenv("GEMINI_API_KEY", "")
+                    api_key = st.text_input(
+                        "Google AI API Key", 
+                        value=env_api_key,
+                        type="password", 
+                        help="Enter your Google AI Studio API key",
+                        key="manual_gemini_key"
+                    )
+                
+                # Store manual configuration
+                if api_key:
+                    st.session_state['llm_auto_config'] = {
+                        'provider': provider_key,
+                        'model': model,
+                        'api_key': api_key
+                    }
 
     # Create tabs for analysis
-    tab1, tab2, tab3, tab4 = st.tabs(["Data Overview", "Data Profiling", "Anomaly Detection", "AI Recommendations"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Data Overview", "Data Profiling", "Anomaly Detection", "Data Comparison", "AI Recommendations"])
     
     with tab1:
         data_overview_tab()
@@ -127,11 +234,16 @@ def main():
         anomaly_detection_tab(anomaly_threshold)
     
     with tab4:
+        data_comparison_tab()
+    
+    with tab5:
+        # Get LLM configuration from session state
+        llm_config = st.session_state.get('llm_auto_config', {})
         ai_recommendations_tab(
             use_llm, 
-            api_key if 'api_key' in locals() else "", 
-            model if 'model' in locals() else "gpt-3.5-turbo",
-            provider.lower() if 'provider' in locals() else "openai"
+            llm_config.get('api_key', ""), 
+            llm_config.get('model', "gemini-2.0-flash"),
+            llm_config.get('provider', "gemini")
         )
 
 
