@@ -10,12 +10,12 @@ from datetime import datetime
 from ydata_profiling import ProfileReport
 
 
-def data_profiling_tab(chunk_size: int, max_workers: int, anomaly_threshold: float):
+def data_profiling_tab(anomaly_threshold: float):
     """Data profiling tab"""
-    st.header("📊 Data Profiling")
+    st.header("Data Profiling")
     
     if st.session_state.data is None:
-        st.warning("⚠️ Please load data first in the Data Source tab")
+        st.warning("Please load data first using the sidebar")
         return
     
     # Show current dataset info
@@ -40,18 +40,18 @@ def data_profiling_tab(chunk_size: int, max_workers: int, anomaly_threshold: flo
         st.write(f"**Dataset:** {len(df):,} rows × {len(df.columns)} columns ({dataset_size_mb:.1f} MB)")
     
     with col2:
-        if st.button("🔄 Run Profiling", type="primary", key="run_profiling_button"):
-            run_data_profiling(df, chunk_size, max_workers, anomaly_threshold)
+        if st.button("Run Profiling", type="primary", key="run_profiling_button"):
+            run_data_profiling(df, anomaly_threshold)
     
     # Show results if available
     if st.session_state.get('ydata_profile'):
         display_ydata_profiling_results(st.session_state.ydata_profile)
 
 
-def run_data_profiling(df: pd.DataFrame, chunk_size: int, max_workers: int, anomaly_threshold: float):
+def run_data_profiling(df: pd.DataFrame, anomaly_threshold: float):
     """Run data profiling on the dataset using ydata-profiling"""
     try:
-        with st.spinner("🔍 Running comprehensive data profiling with ydata-profiling..."):
+        with st.spinner("Running comprehensive data profiling with ydata-profiling..."):
             # Run profiling with timing
             start_time = time.time()
             

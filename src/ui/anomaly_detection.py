@@ -11,11 +11,11 @@ from typing import Dict, Any
 
 def anomaly_detection_tab(anomaly_threshold: float):
     """Anomaly detection tab - powered by ydata-profiling"""
-    st.header("🎯 Anomaly Detection")
-    st.info("🔍 **Powered by ydata-profiling** - All anomaly detection is performed using ydata-profiling's robust statistical methods.")
+    st.header("Anomaly Detection")
+    st.info("Powered by ydata-profiling - All anomaly detection is performed using ydata-profiling's robust statistical methods.")
     
     if st.session_state.data is None:
-        st.warning("⚠️ Please load data first in the Data Source tab")
+        st.warning("Please load data first using the sidebar")
         return
     
     # Show current dataset info
