@@ -95,6 +95,9 @@ def connect_to_snowflake(account, username, password, warehouse, database, schem
                     st.info(f"Found {len(tables)} tables in schema {schema}")
                 else:
                     st.warning("No tables found in the specified schema")
+                
+                # Rerun to immediately show the data loading interface
+                st.rerun()
             else:
                 st.error("🔴 Failed to connect to Snowflake. Please check your credentials.")
                 

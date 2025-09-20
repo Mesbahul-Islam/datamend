@@ -418,24 +418,6 @@ def display_export_options(profile):
         
         st.success("Report ready for download! The HTML file contains:")
         
-        features = [
-            "Interactive data exploration",
-            "Comprehensive statistical analysis", 
-            "Distribution plots and histograms",
-            "Correlation matrices",
-            "Data quality warnings",
-            "Missing data patterns",
-            "Anomaly detection results",
-            "Mobile-responsive design"
-        ]
-        
-        col1, col2 = st.columns(2)
-        for i, feature in enumerate(features):
-            if i % 2 == 0:
-                col1.write(f"• {feature}")
-            else:
-                col2.write(f"• {feature}")
-        
         st.info("**Tip**: Open the downloaded HTML file in your browser for the best viewing experience with full interactivity.")
         
     except Exception as e:

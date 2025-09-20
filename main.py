@@ -75,7 +75,7 @@ def main():
         
         # Analysis configuration (simplified)
         anomaly_threshold = st.slider("Anomaly Threshold", min_value=1.0, max_value=5.0, value=2.0, step=0.1,
-                                    help="Z-score threshold for anomaly detection")
+                                    help="Z-score threshold for anomaly detection. Higher values mean stricter anomaly detection.")
         
         # LLM configuration
         st.subheader("AI Recommendations")
