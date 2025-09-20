@@ -58,8 +58,36 @@ def main():
         st.subheader("🤖 AI Recommendations")
         use_llm = st.checkbox("Enable AI Recommendations", value=False)
         if use_llm:
-            api_key = st.text_input("LLM API Key", type="password", help="Optional: Enter your LLM API key for AI recommendations")
-            model = st.selectbox("Model", ["gpt-3.5-turbo", "gpt-4", "claude-3-sonnet","Gemini Flash 2.0"], index=0)
+            provider = st.selectbox(
+                "LLM Provider", 
+                ["OpenAI", "Google Gemini"], 
+                index=0,
+                help="Choose your preferred LLM provider"
+            )
+            
+            if provider == "OpenAI":
+                api_key = st.text_input(
+                    "OpenAI API Key", 
+                    type="password", 
+                    help="Enter your OpenAI API key"
+                )
+                model = st.selectbox(
+                    "Model", 
+                    ["gpt-3.5-turbo", "gpt-4", "gpt-4-turbo"], 
+                    index=0
+                )
+            else:  # Google Gemini
+                api_key = st.text_input(
+                    "Google AI API Key", 
+                    type="password", 
+                    help="Enter your Google AI Studio API key (get it from https://aistudio.google.com/app/apikey)"
+                )
+                model = st.selectbox(
+                    "Model", 
+                    ["gemini-2.0-flash", "gemini-2.0-pro"], 
+                    index=0,
+                    help="Gemini models available through Google AI"
+                )
 
     # Create tabs
     tab1, tab2, tab3, tab4 = st.tabs(["📁 Data Source", "📊 Data Profiling", "🎯 Anomaly Detection", "🤖 AI Recommendations"])
@@ -74,7 +102,12 @@ def main():
         anomaly_detection_tab(anomaly_threshold)
     
     with tab4:
-        ai_recommendations_tab(use_llm, api_key if 'api_key' in locals() else "", model if 'model' in locals() else "gpt-3.5-turbo")
+        ai_recommendations_tab(
+            use_llm, 
+            api_key if 'api_key' in locals() else "", 
+            model if 'model' in locals() else "gpt-3.5-turbo",
+            provider.lower() if 'provider' in locals() else "openai"
+        )
 
 
 if __name__ == "__main__":
