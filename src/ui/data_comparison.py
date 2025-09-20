@@ -52,46 +52,22 @@ def data_comparison_tab():
         st.error("Error loading selected datasets")
         return
     
-    # Comparison configuration
+    # Comparison configuration (simplified for fast metadata analysis)
     st.subheader("⚙️ Analysis Configuration")
     
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
     
     with col1:
-        analysis_type = st.selectbox(
-            "Analysis Type:",
-            ["Fast Metadata Analysis", "Deep Column Analysis", "Full Comparison"],
-            help="Choose analysis depth - metadata analysis is fastest for large datasets"
-        )
+        export_metadata = st.checkbox("Export metadata to JSON", value=False,
+                                     help="Export detailed metadata to JSON file")
     
     with col2:
-        include_content_hash = st.checkbox("Include Content Fingerprinting", value=True,
-                                         help="Generate content hashes for change detection")
-    
-    with col3:
-        sample_size = st.number_input("Sample Size (for content analysis):", 
-                                    min_value=100, max_value=10000, value=1000,
-                                    help="Number of rows to sample for content analysis")
-    
-    # Advanced options
-    with st.expander("🔧 Advanced Options"):
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            quality_threshold = st.slider("Quality Change Threshold (%):", 1, 50, 5,
-                                        help="Minimum quality score change to flag")
-            statistical_threshold = st.slider("Statistical Change Threshold (%):", 1, 100, 10,
-                                             help="Minimum statistical change to flag")
-        
-        with col2:
-            export_metadata = st.checkbox("Export metadata to JSON", value=False)
-            show_hashes = st.checkbox("Show hash details", value=False)
+        show_hashes = st.checkbox("Show hash details", value=False,
+                                help="Display hash information (if available)")
     
     # Run comparison
     if st.button("🚀 Run Metadata Analysis", type="primary"):
         run_metadata_comparison(
             dataset1, dataset2, dataset1_name, dataset2_name,
-            analysis_type, include_content_hash, sample_size,
-            quality_threshold, statistical_threshold,
             export_metadata, show_hashes
         )

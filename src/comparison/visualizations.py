@@ -80,8 +80,14 @@ def create_metadata_comparison_charts(comparison_result: Dict[str, Any],
         row=1, col=2
     )
     
-    # 3. Data Quality Comparison
-    quality_scores = [metadata1.data_quality_score, metadata2.data_quality_score]
+    # 3. Data Quality Comparison (calculated from null percentages)
+    def calculate_quality_score(metadata):
+        total_cells = metadata.row_count * metadata.column_count
+        if total_cells > 0:
+            return 100 - (metadata.total_null_count / total_cells * 100)
+        return 100
+    
+    quality_scores = [calculate_quality_score(metadata1), calculate_quality_score(metadata2)]
     
     fig.add_trace(
         go.Bar(
@@ -202,7 +208,9 @@ def display_dataset_metadata_summary(metadata: DatasetMetadata, show_hashes: boo
     st.write(f"• **Source**: {metadata.source_type}")
     st.write(f"• **Rows**: {metadata.row_count:,}")
     st.write(f"• **Columns**: {metadata.column_count}")
-    st.write(f"• **Memory Usage**: {metadata.memory_usage / 1024 / 1024:.1f} MB")
+    # Calculate approximate memory usage in MB
+    memory_mb = (metadata.row_count * metadata.column_count * 8) / 1024 / 1024  # Estimate 8 bytes per cell
+    st.write(f"• **Memory Usage**: {memory_mb:.1f} MB (estimated)")
     st.write(f"• **Created**: {metadata.creation_time.strftime('%Y-%m-%d %H:%M:%S')}")
     
     # Data quality
@@ -217,32 +225,32 @@ def display_dataset_metadata_summary(metadata: DatasetMetadata, show_hashes: boo
     st.write(f"• **Categorical**: {len(metadata.categorical_columns)}")
     st.write(f"• **DateTime**: {len(metadata.datetime_columns)}")
     
-    if show_hashes:
-        st.write("**Fingerprints:**")
-        st.write(f"• **Schema**: `{metadata.schema_hash[:12]}...`")
-        st.write(f"• **Structure**: `{metadata.structure_hash[:12]}...`")
-        st.write(f"• **Content**: `{metadata.content_hash[:12]}...`")
+    # Hash information removed - not calculated in simplified metadata
 
 
 def display_hash_comparison(metadata1: DatasetMetadata, metadata2: DatasetMetadata):
     """
-    Display hash comparison details
+    Display simplified metadata comparison
     
     Args:
         metadata1: First dataset metadata
         metadata2: Second dataset metadata
     """
+    st.write("**Basic Structure Comparison:**")
     
-    hash_comparisons = [
-        ('Schema Hash', metadata1.schema_hash, metadata2.schema_hash),
-        ('Structure Hash', metadata1.structure_hash, metadata2.structure_hash),
-        ('Content Hash', metadata1.content_hash, metadata2.content_hash),
-        ('Stats Hash', metadata1.stats_hash, metadata2.stats_hash)
-    ]
+    # Compare basic structure
+    same_rows = metadata1.row_count == metadata2.row_count
+    same_cols = metadata1.column_count == metadata2.column_count
+    same_schema = set(metadata1.column_names) == set(metadata2.column_names)
     
-    for hash_name, hash1, hash2 in hash_comparisons:
-        status = "✅ Match" if hash1 == hash2 else "❌ Different"
-        st.write(f"**{hash_name}**: {status}")
-        if hash1 != hash2:
-            st.write(f"  • Dataset 1: `{hash1[:20]}...`")
-            st.write(f"  • Dataset 2: `{hash2[:20]}...`")
+    st.write(f"**Rows**: {'✅ Same' if same_rows else '❌ Different'} ({metadata1.row_count:,} vs {metadata2.row_count:,})")
+    st.write(f"**Columns**: {'✅ Same' if same_cols else '❌ Different'} ({metadata1.column_count} vs {metadata2.column_count})")
+    st.write(f"**Schema**: {'✅ Same' if same_schema else '❌ Different'}")
+    
+    if not same_schema:
+        only_in_1 = set(metadata1.column_names) - set(metadata2.column_names)
+        only_in_2 = set(metadata2.column_names) - set(metadata1.column_names)
+        if only_in_1:
+            st.write(f"  • Only in Dataset 1: {', '.join(only_in_1)}")
+        if only_in_2:
+            st.write(f"  • Only in Dataset 2: {', '.join(only_in_2)}")
