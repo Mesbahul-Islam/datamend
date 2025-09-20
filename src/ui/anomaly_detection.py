@@ -12,16 +12,16 @@ from src.ui.data_profiling import display_ai_recommendations_section
 
 
 def anomaly_detection_tab(anomaly_threshold: float):
-    """Statistical outlier analysis results - powered by ydata-profiling"""
-    st.header("📊 Statistical Outlier Analysis")
+    """Statistical anomaly analysis results - powered by ydata-profiling"""
+    st.header("📊 Statistical Anomaly Analysis")
     
     # Clear explanation of what this tab does
-    st.info("🎯 **Purpose:** View and analyze statistical outliers detected in your data using ydata-profiling's IQR method. "
+    st.info("🎯 **Purpose:** View and analyze statistical anomalies detected in your data using ydata-profiling's IQR method. "
             "This helps identify unusual data points that may indicate errors or rare events.")
     
     # Link to data profiling
     st.warning("⚠️ **Prerequisites:** You must first run profiling in the **Data Profiling** tab, then use the "
-               "**'🎯 Outlier Detection'** sub-tab to generate results before viewing them here.")
+               "**'🎯 Anomaly Detection'** sub-tab to generate results before viewing them here.")
     
     if st.session_state.data is None:
         st.warning("Please load data first using the sidebar")
@@ -31,53 +31,66 @@ def anomaly_detection_tab(anomaly_threshold: float):
     if st.session_state.current_dataset:
         st.info(f"Analyzing Dataset: {st.session_state.current_dataset}")
     
-    # Check if ydata-profiling outlier detection was run
+    # Check if ydata-profiling anomaly detection was run
     if st.session_state.get('ydata_anomaly_detection', False):
-        st.success("🟢 Statistical Outlier Results Available!")
+        st.success("🟢 Statistical Anomaly Results Available!")
         
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("📊 View Outlier Results", type="primary", width='stretch'):
+            if st.button("📊 View Anomaly Results", type="primary", width='stretch'):
                 if st.session_state.get('ydata_anomaly_results'):
                     display_ydata_anomaly_results(st.session_state.ydata_anomaly_results, st.session_state.data)
                 else:
-                    st.warning("No outlier results found. Please run outlier detection from the Data Profiling tab.")
+                    st.warning("No anomaly results found. Please run anomaly detection from the Data Profiling tab.")
         
         with col2:
             if st.button("📈 View Comprehensive Analysis", type="secondary", width='stretch'):
                 if st.session_state.get('ydata_comprehensive_analysis'):
                     display_comprehensive_analysis_summary(st.session_state.ydata_comprehensive_analysis)
                 else:
-                    st.info("Run 'Outlier Summary' from the Data Profiling → Outlier Detection tab for comprehensive analysis.")
+                    st.info("Run 'Anomaly Summary' from the Data Profiling → Anomaly Detection tab for comprehensive analysis.")
         
         st.markdown("---")
-
-
-def display_ydata_anomaly_results(outliers_info, df: pd.DataFrame):
-    """Display ydata-profiling statistical outlier results with visualizations"""
-    st.subheader("📊 Statistical Outlier Analysis Results")
     
-    if not outliers_info:
-        st.success("🟢 Excellent! No statistical outliers detected by ydata-profiling.")
+    else:
+        # No anomaly detection results available
+        st.warning("🔍 **No Anomaly Detection Results Available**")
+        st.info("To use this tab, please:")
+        st.write("1. **Go to Data Profiling tab**")
+        st.write("2. **Run data profiling** on your dataset")
+        st.write("3. **Navigate to the 'Anomaly Detection' sub-tab**")
+        st.write("4. **Click 'Extract Anomalies'** to generate results")
+        st.write("5. **Return here** to view and analyze the anomaly detection results")
+        
+        st.markdown("---")
+        st.info("💡 **Tip:** The Anomaly Detection uses ydata-profiling's robust IQR method to identify statistical anomalies in your numeric data columns.")
+
+
+def display_ydata_anomaly_results(anomalies_info, df: pd.DataFrame):
+    """Display ydata-profiling statistical anomaly results with visualizations"""
+    st.subheader("📊 Statistical Anomaly Analysis Results")
+    
+    if not anomalies_info:
+        st.success("🟢 Excellent! No statistical anomalies detected by ydata-profiling.")
         return
     
     # Summary metrics
-    total_outliers = sum(info['count'] for info in outliers_info.values())
-    outlier_rate = (total_outliers / len(df)) * 100
+    total_anomalies = sum(info['count'] for info in anomalies_info.values())
+    anomaly_rate = (total_anomalies / len(df)) * 100
     
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("Total Outliers", f"{total_outliers:,}")
+        st.metric("Total Anomalies", f"{total_anomalies:,}")
     with col2:
-        st.metric("Affected Columns", len(outliers_info))
+        st.metric("Affected Columns", len(anomalies_info))
     with col3:
-        st.metric("Outlier Rate", f"{outlier_rate:.2f}%")
+        st.metric("Anomaly Rate", f"{anomaly_rate:.2f}%")
     with col4:
-        severity = "🔴 High" if outlier_rate > 5 else "🟡 Medium" if outlier_rate > 1 else "🟢 Low"
+        severity = "🔴 High" if anomaly_rate > 10 else "🟡 Medium" if anomaly_rate > 1 else "🟢 Low"
         st.metric("Severity Level", severity)
     
     # Create visualizations for each column with anomalies
-    for column, info in outliers_info.items():
+    for column, info in anomalies_info.items():
         st.subheader(f"📈 Anomaly Visualization: {column}")
         
         try:
@@ -105,7 +118,7 @@ def display_ydata_anomaly_results(outliers_info, df: pd.DataFrame):
                 st.write(f"• Std Dev: {stats['std']:.3f}")
                 st.write(f"• IQR: {stats['IQR']:.3f}")
     
-    # AI Recommendations section after outlier analysis
+    # AI Recommendations section after anomaly analysis
     st.markdown("---")
     display_ai_recommendations_section("outliers")
 
@@ -151,7 +164,7 @@ def create_ydata_anomaly_visualization(df: pd.DataFrame, column: str, anomaly_in
              bbox=dict(boxstyle="round,pad=0.5", facecolor="lightblue", alpha=0.8),
              verticalalignment='top', fontweight='bold')
     
-    # Plot 2: Box plot showing distribution and outliers
+    # Plot 2: Box plot showing distribution and anomalies
     box_data = [column_data.values]
     bp = ax2.boxplot(box_data, labels=[column], patch_artist=True)
     bp['boxes'][0].set_facecolor('lightblue')
@@ -182,7 +195,7 @@ def display_comprehensive_analysis_summary(analysis_data):
     """Display summary of comprehensive anomaly analysis"""
     st.subheader("📈 Comprehensive Anomaly Analysis Summary")
     
-    outliers_info = analysis_data['outliers_info']
+    anomalies_info = analysis_data['outliers_info']
     total_anomalies = analysis_data['total_anomalies']
     anomaly_rate = analysis_data['anomaly_rate']
     assessment = analysis_data['assessment']

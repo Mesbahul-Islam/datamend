@@ -67,10 +67,6 @@ def data_profiling_tab(anomaly_threshold: float):
     # Show results if available
     if st.session_state.get('ydata_profile'):
         display_ydata_profiling_results(st.session_state.ydata_profile, anomaly_threshold)
-        
-        # AI Recommendations section after profiling is complete
-        st.markdown("---")
-        display_ai_recommendations_section("profiling")
 
 
 def run_data_profiling(df: pd.DataFrame, anomaly_threshold: float):
@@ -109,19 +105,28 @@ def display_ydata_profiling_results(profile, anomaly_threshold: float):
 
     
     # Create tabs for different views
-    tab1, tab2, tab3, tab4 = st.tabs(["Quick Summary", "Detailed Report", "Outlier Detection", "Analytics Quality"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Quick Summary", "Detailed Report", "Anomaly Detection", "Analytics Quality"])
     
     with tab1:
         display_ydata_summary(profile)
     
     with tab2:
         display_enhanced_report(profile)
+        # AI Insights for Detailed Report
+        st.markdown("---")
+        display_ai_recommendations_section("profiling_detailed")
     
     with tab3:
-        display_outlier_detection_section(profile, anomaly_threshold)
+        display_anomaly_detection_section(profile, anomaly_threshold)
+        # AI Insights for Anomaly Detection
+        st.markdown("---")
+        display_ai_recommendations_section("profiling_outliers")
     
     with tab4:
         display_quality_analysis_section(st.session_state.data)
+        # AI Analytics Suitability Decision
+        st.markdown("---")
+        display_analytics_suitability_ai_section()
     
     # Export options section
     st.markdown("---")
@@ -360,9 +365,9 @@ def display_enhanced_report(profile):
         st.info("Please try the Quick Summary view or download the report for offline viewing.")
 
 
-def display_outlier_detection_section(profile, anomaly_threshold: float):
-    """Display outlier/anomaly detection section using ydata-profiling"""
-    st.markdown("### Statistical Outlier Detection")
+def display_anomaly_detection_section(profile, anomaly_threshold: float):
+    """Display anomaly detection section using ydata-profiling"""
+    st.markdown("### Statistical Anomaly Detection")
     st.info(f"Uses configurable IQR (Interquartile Range) method with threshold {anomaly_threshold:.1f} to detect statistical outliers in numeric columns.")
     
     # Technical explanation
@@ -374,10 +379,10 @@ def display_outlier_detection_section(profile, anomaly_threshold: float):
         st.write("• Lower thresholds (e.g., 1.0) detect more outliers, higher thresholds (e.g., 3.0) are more conservative")
         st.write("• Robust against various data distributions")
     
-    if st.button("Extract Outliers", type="primary", use_container_width=True, help="Extract outliers detected by ydata-profiling"):
+    if st.button("Extract Anomalies", type="primary", use_container_width=True, help="Extract anomalies detected by ydata-profiling"):
         display_profiling_outliers(profile, st.session_state.data, anomaly_threshold)
     
-    if st.button("Outlier Summary", type="secondary", use_container_width=True, help="Show comprehensive outlier analysis from profiling"):
+    if st.button("Anomaly Summary", type="secondary", use_container_width=True, help="Show comprehensive anomaly analysis from profiling"):
         # Clear the page and show full analysis
         st.empty()
         display_full_anomaly_analysis_page(profile, st.session_state.data, anomaly_threshold)
@@ -420,7 +425,7 @@ def display_export_options(profile):
             "Correlation matrices",
             "Data quality warnings",
             "Missing data patterns",
-            "Outlier detection results",
+            "Anomaly detection results",
             "Mobile-responsive design"
         ]
         
@@ -454,12 +459,12 @@ def extract_profiling_outliers(profile, df: pd.DataFrame, threshold: float = 1.5
                 if len(column_data) == 0:
                     continue
                 
-                # Use configurable IQR method for outlier detection
+                # Use configurable IQR method for anomaly detection
                 Q1 = column_data.quantile(0.25)
                 Q3 = column_data.quantile(0.75)
                 IQR = Q3 - Q1
                 
-                # Configurable IQR outlier detection using threshold parameter
+                # Configurable IQR anomaly detection using threshold parameter
                 lower_bound = Q1 - threshold * IQR
                 upper_bound = Q3 + threshold * IQR
                 
@@ -987,11 +992,11 @@ def display_quality_analysis_section(df: pd.DataFrame):
     
     # Clear explanation of the difference
     st.info(" **Focus:** Identifies data quality issues that could break or bias downstream analytics "
-            "(machine learning, SQL queries, statistical analysis) - different from statistical outlier detection.")
+            "(machine learning, SQL queries, statistical analysis) - different from statistical anomaly detection.")
     
-    # Comparison with outlier detection
-    with st.expander(" What's the difference from outlier detection?"):
-        st.write("**Statistical Outlier Detection** (Previous tab):")
+    # Comparison with anomaly detection
+    with st.expander(" What's the difference from anomaly detection?"):
+        st.write("**Statistical Anomaly Detection** (Previous tab):")
         st.write("• Finds unusual values in individual data points")
         st.write("• Uses statistical methods (IQR, standard deviation)")
         st.write("• Helps identify data entry errors or rare events")
@@ -1143,12 +1148,26 @@ def run_quality_analysis(df: pd.DataFrame):
                     recommendation="Clean and standardize data types before analytics"
                 ))
             
-            # Calculate overall quality score
+            # Calculate overall quality score (more strict scoring)
             critical_count = len([i for i in issues if i.severity == "critical"])
             high_count = len([i for i in issues if i.severity == "high"])
             medium_count = len([i for i in issues if i.severity == "medium"])
             
-            score = max(0, 100 - (critical_count * 30) - (high_count * 20) - (medium_count * 10))
+            # More strict scoring: Critical issues have major impact, high issues are significant
+            score = max(0, 100 - (critical_count * 50) - (high_count * 30) - (medium_count * 15))
+            
+            # Additional penalties for multiple issues
+            total_issues = len(issues)
+            if total_issues > 5:
+                score = max(0, score - ((total_issues - 5) * 5))  # Extra penalty for many issues
+            
+            # Cap score at 85 if any critical issues exist (never "excellent" with critical issues)
+            if critical_count > 0:
+                score = min(score, 85)
+            
+            # Cap score at 90 if any high issues exist
+            if high_count > 0:
+                score = min(score, 90)
             
             results = {
                 "quality_score": score,
@@ -1169,16 +1188,20 @@ def display_quality_analysis_results(results: Dict[str, Any]):
     quality_score = results.get("quality_score", 0)
     issues = results.get("issues", [])
     
-    # Quality score display
+    # Quality score display with more realistic thresholds
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        if quality_score >= 80:
+        if quality_score >= 90:
+            st.metric("Analytics Quality Score", f"{quality_score}/100", delta="Excellent", delta_color="normal")
+        elif quality_score >= 75:
             st.metric("Analytics Quality Score", f"{quality_score}/100", delta="Good", delta_color="normal")
         elif quality_score >= 60:
             st.metric("Analytics Quality Score", f"{quality_score}/100", delta="Fair", delta_color="off")
-        else:
+        elif quality_score >= 40:
             st.metric("Analytics Quality Score", f"{quality_score}/100", delta="Poor", delta_color="inverse")
+        else:
+            st.metric("Analytics Quality Score", f"{quality_score}/100", delta="Critical", delta_color="inverse")
     
     with col2:
         critical_count = len([i for i in issues if i.severity == "critical"])
@@ -1188,13 +1211,20 @@ def display_quality_analysis_results(results: Dict[str, Any]):
         total_issues = len(issues)
         st.metric("Total Issues", total_issues)
     
-    # Overall assessment
-    if quality_score >= 80:
-        st.success("Data is suitable for analytics with minimal preprocessing required.")
+    # More realistic overall assessment
+    if quality_score >= 90:
+        st.success("📊 Excellent data quality - Ready for advanced analytics with minimal preprocessing.")
+    elif quality_score >= 75:
+        st.info("✅ Good data quality - Suitable for most analytics with minor cleanup.")
     elif quality_score >= 60:
-        st.warning("Data requires some cleanup before running analytics.")
+        st.warning("⚠️ Fair data quality - Requires moderate cleanup before reliable analytics.")
+    elif quality_score >= 40:
+        st.warning("🔧 Poor data quality - Significant preprocessing needed before analytics.")
     else:
-        st.error("Data has significant quality issues that must be resolved before analytics.")
+        st.error("❌ Critical data quality issues - Major remediation required before any analytics.")
+    
+    # Always recommend AI analysis for deeper insights
+    st.info("💡 **Recommendation**: Use the 'AI Analytics Suitability Assessment' below for deeper insights and specific recommendations based on these quality metrics.")
     
     # Issues breakdown
     if issues:
@@ -1282,6 +1312,12 @@ def display_ai_recommendations_section(context: str):
     if context == "profiling":
         st.subheader("🤖 AI Insights for Data Profiling")
         description = "Get AI-powered insights about your data quality, patterns, and potential issues based on the profiling results."
+    elif context == "profiling_detailed":
+        st.subheader("🤖 AI Insights for Detailed Report")
+        description = "Get comprehensive AI analysis of your detailed data profiling report including patterns, relationships, and data quality insights."
+    elif context == "profiling_outliers":
+        st.subheader("🤖 AI Analysis of Anomaly Detection")
+        description = "Get AI explanations about your anomaly detection results and recommendations for handling statistical anomalies."
     elif context == "outliers":
         st.subheader("🤖 AI Explanation of Outlier Analysis")
         description = "Get AI explanations about what the statistical outlier results mean for your data and what actions to take."
@@ -1292,7 +1328,7 @@ def display_ai_recommendations_section(context: str):
         st.subheader("🤖 AI Recommendations")
         description = "Get AI-powered recommendations based on your analysis."
     
-    col1, col2 = st.columns([3, 1])
+    col1, col2, col3 = st.columns([2, 1, 1])
     
     with col1:
         st.write(description)
@@ -1301,7 +1337,21 @@ def display_ai_recommendations_section(context: str):
     with col2:
         button_key = f"get_ai_{context}_insights"
         if st.button("Get AI Insights", type="secondary", key=button_key):
+            # Clear any existing recommendations for this context before generating new ones
+            recommendations_key = f'ai_recommendations_{context}'
+            if recommendations_key in st.session_state:
+                del st.session_state[recommendations_key]
             generate_contextual_recommendations(context, llm_config)
+    
+    with col3:
+        # Add a clear button to remove insights for this context
+        clear_key = f"clear_ai_{context}_insights"
+        recommendations_key = f'ai_recommendations_{context}'
+        if st.session_state.get(recommendations_key):
+            if st.button("Clear Insights", type="secondary", key=clear_key):
+                if recommendations_key in st.session_state:
+                    del st.session_state[recommendations_key]
+                st.rerun()
     
     # Show recommendations if available for this context
     recommendations_key = f'ai_recommendations_{context}'
@@ -1325,6 +1375,10 @@ def generate_contextual_recommendations(context: str, llm_config: dict):
             # Build context-specific prompts
             if context == "profiling":
                 prompt = build_profiling_prompt()
+            elif context == "profiling_detailed":
+                prompt = build_detailed_profiling_prompt()
+            elif context == "profiling_outliers":
+                prompt = build_profiling_outliers_prompt()
             elif context == "outliers":
                 prompt = build_outliers_prompt()
             elif context == "lineage":
@@ -1335,11 +1389,16 @@ def generate_contextual_recommendations(context: str, llm_config: dict):
             # Call the LLM API and store raw response
             raw_response = analyzer._call_llm_api(prompt)
             
-            # Store the raw response directly in session state
+            # Store the raw response directly in session state with context-specific key
             recommendations_key = f'ai_recommendations_{context}'
             st.session_state[recommendations_key] = raw_response
+            
+            # Track which context was last generated to help with debugging
+            st.session_state['last_ai_context'] = context
         
         st.success(f"🟢 AI insights for {context} generated successfully!")
+        # Force a rerun to show the new insights immediately
+        st.rerun()
         
     except Exception as e:
         st.error(f"🔴 Error generating AI insights: {str(e)}")
@@ -1403,7 +1462,7 @@ def build_outliers_prompt() -> str:
     column_outlier_counts = {col: len(outliers) for col, outliers in outlier_data.items()}
     
     prompt = f"""
-    Analyze these statistical outlier detection results and explain their significance:
+    Analyze these statistical anomaly detection results and explain their significance:
     
     Outlier Summary:
     - Total outliers detected: {total_outliers}
@@ -1477,6 +1536,16 @@ def display_contextual_recommendations(raw_response: str, context: str):
     if raw_response:
         cleaned_response = raw_response.strip()
         
+        # Remove markdown code block markers if present
+        if cleaned_response.startswith('```json'):
+            cleaned_response = cleaned_response[7:]  # Remove ```json
+        if cleaned_response.startswith('```'):
+            cleaned_response = cleaned_response[3:]   # Remove ```
+        if cleaned_response.endswith('```'):
+            cleaned_response = cleaned_response[:-3]  # Remove trailing ```
+        
+        cleaned_response = cleaned_response.strip()
+        
         # Try to parse as JSON first
         try:
             import json
@@ -1485,11 +1554,20 @@ def display_contextual_recommendations(raw_response: str, context: str):
             # Check if it's the structured data quality assessment format
             if "data_quality_assessment" in parsed:
                 display_structured_assessment(parsed["data_quality_assessment"])
+            elif "data_profiling_insights" in parsed:
+                # Handle detailed data profiling insights format
+                display_data_profiling_insights(parsed["data_profiling_insights"])
+            elif "analysisSummary" in parsed and "treatmentStrategies" in parsed and "recommendations" in parsed:
+                # Handle anomaly detection analysis format
+                display_anomaly_analysis_results(parsed)
+            elif "data_cleaning_recommendations" in parsed:
+                # Handle case where the response has the recommendations at the top level
+                display_structured_assessment(parsed)
             else:
                 # Display as formatted JSON
                 st.json(parsed)
                 
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
             # If not JSON, display as markdown text
             st.markdown(cleaned_response)
     else:
@@ -1499,24 +1577,36 @@ def display_contextual_recommendations(raw_response: str, context: str):
 def display_structured_assessment(assessment: dict):
     """Display structured data quality assessment in a user-friendly format"""
     
+    # Handle both nested and flat JSON structures
+    # Check if this is the assessment object or the outer wrapper
+    if "data_quality_assessment" in assessment:
+        assessment_data = assessment["data_quality_assessment"]
+        recommendations = assessment.get("data_cleaning_recommendations", [])
+        action_items = assessment.get("prioritized_action_items", [])
+    else:
+        assessment_data = assessment
+        recommendations = assessment.get("data_cleaning_recommendations", [])
+        action_items = assessment.get("prioritized_action_items", [])
+    
     # Overall Assessment
-    if "overall_assessment" in assessment:
-        st.info(f"**📋 Overall Assessment:** {assessment['overall_assessment']}")
+    overall_key = "overall_assessment" if "overall_assessment" in assessment_data else "overall_quality"
+    if overall_key in assessment_data:
+        st.info(f"**📋 Overall Assessment:** {assessment_data[overall_key]}")
     
     # Key Concerns and Risks
-    if "key_concerns_and_risks" in assessment and assessment["key_concerns_and_risks"]:
+    if "key_concerns_and_risks" in assessment_data and assessment_data["key_concerns_and_risks"]:
         st.subheader("⚠️ Key Concerns and Risks")
         
-        for i, concern in enumerate(assessment["key_concerns_and_risks"], 1):
+        for i, concern in enumerate(assessment_data["key_concerns_and_risks"], 1):
             with st.expander(f"🔴 {concern.get('concern', f'Concern {i}')}"):
                 st.write(f"**Risk:** {concern.get('risk', 'No risk description provided')}")
                 st.write(f"**Mitigation:** {concern.get('mitigation', 'No mitigation strategy provided')}")
     
     # Data Cleaning Recommendations
-    if "data_cleaning_recommendations" in assessment and assessment["data_cleaning_recommendations"]:
+    if recommendations:
         st.subheader("🧹 Data Cleaning Recommendations")
         
-        for rec in assessment["data_cleaning_recommendations"]:
+        for rec in recommendations:
             priority = rec.get('priority', 'Medium')
             priority_color = {
                 'High': '🔴',
@@ -1524,15 +1614,20 @@ def display_structured_assessment(assessment: dict):
                 'Low': '🟢'
             }.get(priority, '🟡')
             
-            with st.expander(f"{priority_color} {rec.get('action', 'Action')} - {priority} Priority"):
-                st.write(f"**Variable(s):** {rec.get('variable', 'Not specified')}")
-                st.write(f"**Details:** {rec.get('details', 'No details provided')}")
+            variable = rec.get('variable', 'Not specified')
+            issue = rec.get('issue', rec.get('action', 'Action'))
+            
+            with st.expander(f"{priority_color} {variable}: {issue} - {priority} Priority"):
+                if 'recommendation' in rec:
+                    st.write(f"**Recommendation:** {rec['recommendation']}")
+                elif 'details' in rec:
+                    st.write(f"**Details:** {rec['details']}")
     
     # Prioritized Action Items
-    if "prioritized_action_items" in assessment and assessment["prioritized_action_items"]:
+    if action_items:
         st.subheader("📋 Prioritized Action Plan")
         
-        for item in assessment["prioritized_action_items"]:
+        for item in action_items:
             priority = item.get('priority', 0)
             action = item.get('action', 'No action specified')
             rationale = item.get('rationale', 'No rationale provided')
@@ -1540,3 +1635,628 @@ def display_structured_assessment(assessment: dict):
             st.write(f"**{priority}.** {action}")
             st.caption(f"💡 Rationale: {rationale}")
             st.markdown("---")
+
+
+def display_analytics_suitability_ai_section():
+    """Display AI section for analytics suitability assessment"""
+    llm_config = st.session_state.get('llm_auto_config', {})
+    
+    # Only show if LLM configuration exists and has an API key
+    if not llm_config or not llm_config.get('api_key'):
+        st.warning("🤖 AI Analytics Suitability Assessment available! Enable AI in the sidebar and add your API key to get intelligent analytics readiness insights.")
+        return
+    
+    st.subheader("🤖 AI Analytics Suitability Assessment")
+    st.write("Get AI-powered assessment of whether your data is suitable for analytics and machine learning based on quality analysis results.")
+    st.caption("💡 Powered by AI - Analyzes quality metrics to make data readiness decisions")
+    
+    col1, col2, col3 = st.columns([2, 1, 1])
+    
+    with col1:
+        st.info("This assessment requires quality analysis results. Run the Analytics Quality Check above first.")
+    
+    with col2:
+        if st.button("Assess Analytics Readiness", type="primary", key="analytics_suitability_ai"):
+            # Check if quality analysis has been run
+            if not st.session_state.get('quality_analysis_results'):
+                st.error("Please run the Analytics Quality Check first to get quality metrics for AI assessment.")
+                return
+            
+            # Clear any existing assessment
+            if 'ai_analytics_suitability' in st.session_state:
+                del st.session_state['ai_analytics_suitability']
+            
+            generate_analytics_suitability_assessment(llm_config)
+    
+    with col3:
+        # Add a clear button
+        if st.session_state.get('ai_analytics_suitability'):
+            if st.button("Clear Assessment", type="secondary", key="clear_analytics_suitability"):
+                if 'ai_analytics_suitability' in st.session_state:
+                    del st.session_state['ai_analytics_suitability']
+                st.rerun()
+    
+    # Show suitability assessment if available
+    if st.session_state.get('ai_analytics_suitability'):
+        display_analytics_suitability_results(st.session_state['ai_analytics_suitability'])
+
+
+def generate_analytics_suitability_assessment(llm_config: dict):
+    """Generate AI assessment of data suitability for analytics"""
+    try:
+        from src.llm.analyzer import DataQualityLLMAnalyzer, LLMConfig
+        
+        with st.spinner("🔍 AI analyzing data quality metrics for analytics suitability..."):
+            config = LLMConfig(
+                provider=llm_config.get('provider', 'openai'),
+                model=llm_config.get('model', 'gpt-3.5-turbo'),
+                api_key=llm_config.get('api_key', '')
+            )
+            analyzer = DataQualityLLMAnalyzer(config)
+            
+            # Build analytics suitability prompt with quality analysis results
+            prompt = build_analytics_suitability_prompt()
+            
+            # Call the LLM API
+            raw_response = analyzer._call_llm_api(prompt)
+            
+            # Store the response
+            st.session_state['ai_analytics_suitability'] = raw_response
+            st.session_state['last_ai_context'] = 'analytics_suitability'
+        
+        st.success("🟢 Analytics suitability assessment completed!")
+        st.rerun()
+        
+    except Exception as e:
+        st.error(f"🔴 Error generating analytics suitability assessment: {str(e)}")
+        if "api_key" in str(e).lower():
+            if llm_config.get('provider') == "google gemini":
+                st.info("💡 Tip: Get your Google AI API key from https://aistudio.google.com/app/apikey")
+            else:
+                st.info("💡 Tip: Check your OpenAI API key and ensure it has sufficient credits")
+
+
+def build_analytics_suitability_prompt() -> str:
+    """Build a prompt for analytics suitability assessment based on quality analysis"""
+    quality_results = st.session_state.get('quality_analysis_results', {})
+    
+    if not quality_results:
+        return "No quality analysis results available for assessment."
+    
+    quality_score = quality_results.get('quality_score', 0)
+    issues = quality_results.get('issues', [])
+    
+    # Categorize issues by severity
+    critical_issues = [i for i in issues if i.severity == "critical"]
+    high_issues = [i for i in issues if i.severity == "high"]
+    medium_issues = [i for i in issues if i.severity == "medium"]
+    
+    # Build detailed issue summary
+    issues_summary = []
+    for issue in issues:
+        issues_summary.append(f"- {issue.title} ({issue.severity}): {issue.description}")
+    
+    issues_text = "\n".join(issues_summary) if issues_summary else "No significant issues detected"
+    
+    prompt = f"""
+    As a data analytics expert, assess whether this dataset is suitable for analytics and machine learning based on the following quality analysis:
+
+    QUALITY METRICS:
+    - Overall Quality Score: {quality_score}/100
+    - Total Issues Found: {len(issues)}
+    - Critical Issues: {len(critical_issues)}
+    - High Priority Issues: {len(high_issues)}
+    - Medium Priority Issues: {len(medium_issues)}
+
+    DETAILED ISSUES:
+    {issues_text}
+
+    Please provide a JSON response with the following structure:
+    {{
+        "analytics_suitability": {{
+            "overall_verdict": "SUITABLE" or "NOT_SUITABLE" or "CONDITIONALLY_SUITABLE",
+            "confidence_score": 85,
+            "readiness_level": "Production Ready" or "Needs Minor Cleanup" or "Requires Major Cleanup" or "Not Ready",
+            "key_blockers": ["List of main issues preventing analytics use"],
+            "recommended_actions": ["Priority actions to improve analytics readiness"],
+            "analytics_impact": {{
+                "machine_learning": "Good/Fair/Poor - explanation",
+                "statistical_analysis": "Good/Fair/Poor - explanation", 
+                "sql_queries": "Good/Fair/Poor - explanation",
+                "visualization": "Good/Fair/Poor - explanation"
+            }},
+            "timeline_estimate": "Immediate/1-3 days/1-2 weeks/1+ months",
+            "executive_summary": "Brief summary of findings and recommendation"
+        }}
+    }}
+
+    Base your assessment on:
+    1. Critical issues that would break analytics workflows
+    2. Data completeness and consistency
+    3. Impact on different types of analytics
+    4. Effort required to make data analytics-ready
+
+    Be specific and actionable in your recommendations.
+    """
+    
+    return prompt
+
+
+def display_analytics_suitability_results(raw_response: str):
+    """Display analytics suitability assessment results"""
+    st.subheader("📊 Analytics Readiness Assessment")
+    
+    if not raw_response:
+        st.warning("No assessment results available.")
+        return
+    
+    try:
+        import json
+        
+        # Clean and parse the response
+        cleaned_response = raw_response.strip()
+        if cleaned_response.startswith('```json'):
+            cleaned_response = cleaned_response[7:]
+        if cleaned_response.startswith('```'):
+            cleaned_response = cleaned_response[3:]
+        if cleaned_response.endswith('```'):
+            cleaned_response = cleaned_response[:-3]
+        cleaned_response = cleaned_response.strip()
+        
+        parsed = json.loads(cleaned_response)
+        
+        if "analytics_suitability" in parsed:
+            assessment = parsed["analytics_suitability"]
+            
+            # Overall Verdict
+            verdict = assessment.get("overall_verdict", "UNKNOWN")
+            confidence = assessment.get("confidence_score", 0)
+            readiness = assessment.get("readiness_level", "Unknown")
+            
+            # Display verdict with appropriate styling
+            if verdict == "SUITABLE":
+                st.success(f"✅ **ANALYTICS READY** - {readiness}")
+                st.metric("AI Confidence", f"{confidence}%", delta="High Confidence" if confidence > 80 else "Medium Confidence")
+            elif verdict == "CONDITIONALLY_SUITABLE":
+                st.warning(f"⚠️ **CONDITIONALLY SUITABLE** - {readiness}")
+                st.metric("AI Confidence", f"{confidence}%", delta="Review Required")
+            else:
+                st.error(f"❌ **NOT SUITABLE** - {readiness}")
+                st.metric("AI Confidence", f"{confidence}%", delta="Major Issues Found")
+            
+            # Executive Summary
+            if assessment.get("executive_summary"):
+                st.info(f"**📋 Executive Summary:** {assessment['executive_summary']}")
+            
+            # Timeline Estimate
+            timeline = assessment.get("timeline_estimate", "Unknown")
+            st.write(f"**⏱️ Estimated Time to Analytics-Ready:** {timeline}")
+            
+            # Analytics Impact Assessment
+            if "analytics_impact" in assessment:
+                st.subheader("📈 Impact on Different Analytics Types")
+                impact = assessment["analytics_impact"]
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    if "machine_learning" in impact:
+                        ml_status = impact["machine_learning"]
+                        if "Good" in ml_status:
+                            st.success(f"🤖 **Machine Learning:** {ml_status}")
+                        elif "Fair" in ml_status:
+                            st.warning(f"🤖 **Machine Learning:** {ml_status}")
+                        else:
+                            st.error(f"🤖 **Machine Learning:** {ml_status}")
+                    
+                    if "statistical_analysis" in impact:
+                        stats_status = impact["statistical_analysis"]
+                        if "Good" in stats_status:
+                            st.success(f"📊 **Statistical Analysis:** {stats_status}")
+                        elif "Fair" in stats_status:
+                            st.warning(f"📊 **Statistical Analysis:** {stats_status}")
+                        else:
+                            st.error(f"📊 **Statistical Analysis:** {stats_status}")
+                
+                with col2:
+                    if "sql_queries" in impact:
+                        sql_status = impact["sql_queries"]
+                        if "Good" in sql_status:
+                            st.success(f"💾 **SQL Queries:** {sql_status}")
+                        elif "Fair" in sql_status:
+                            st.warning(f"💾 **SQL Queries:** {sql_status}")
+                        else:
+                            st.error(f"💾 **SQL Queries:** {sql_status}")
+                    
+                    if "visualization" in impact:
+                        viz_status = impact["visualization"]
+                        if "Good" in viz_status:
+                            st.success(f"📈 **Visualization:** {viz_status}")
+                        elif "Fair" in viz_status:
+                            st.warning(f"📈 **Visualization:** {viz_status}")
+                        else:
+                            st.error(f"📈 **Visualization:** {viz_status}")
+            
+            # Key Blockers
+            if assessment.get("key_blockers"):
+                st.subheader("🚫 Key Blockers for Analytics")
+                for i, blocker in enumerate(assessment["key_blockers"], 1):
+                    st.error(f"{i}. {blocker}")
+            
+            # Recommended Actions
+            if assessment.get("recommended_actions"):
+                st.subheader("🔧 Recommended Actions")
+                for i, action in enumerate(assessment["recommended_actions"], 1):
+                    st.write(f"**{i}.** {action}")
+            
+        else:
+            # Fallback to raw display
+            st.json(parsed)
+            
+    except json.JSONDecodeError:
+        # Display as markdown if not JSON
+        st.markdown(raw_response)
+
+
+def build_detailed_profiling_prompt() -> str:
+    """Build a prompt for detailed data profiling insights"""
+    if not st.session_state.get('ydata_profile'):
+        return "No detailed profiling data available."
+    
+    profile = st.session_state.ydata_profile
+    description = profile.description_set
+    table_stats = description.table
+    variables = description.variables
+    
+    # Extract comprehensive statistics
+    n_vars = table_stats.get('n_var', 0)
+    n_obs = table_stats.get('n', 0)
+    missing_cells = table_stats.get('n_cells_missing', 0)
+    total_cells = n_obs * n_vars if n_obs > 0 and n_vars > 0 else 1
+    missing_percent = (missing_cells / total_cells) * 100 if total_cells > 0 else 0
+    duplicate_rows = table_stats.get('n_duplicates', 0)
+    duplicate_percent = (duplicate_rows / n_obs) * 100 if n_obs > 0 else 0
+    
+    # Variable type analysis
+    types_summary = table_stats.get('types', {})
+    
+    # Sample variable details
+    variable_samples = []
+    for var_name, var_info in list(variables.items())[:5]:  # First 5 variables
+        var_type = var_info.get('type', 'Unknown')
+        missing_count = var_info.get('n_missing', 0)
+        unique_count = var_info.get('n_distinct', 0)
+        variable_samples.append(f"- {var_name}: {var_type}, {missing_count} missing, {unique_count} unique values")
+    
+    prompt = f"""
+    Provide comprehensive insights for this detailed data profiling report:
+    
+    DATASET OVERVIEW:
+    - Total Variables: {n_vars}
+    - Total Observations: {n_obs:,}
+    - Missing Data: {missing_percent:.1f}% of all cells
+    - Duplicate Rows: {duplicate_percent:.1f}%
+    - Variable Types Distribution: {types_summary}
+    
+    SAMPLE VARIABLE DETAILS:
+    {chr(10).join(variable_samples)}
+    
+    Please provide detailed insights covering:
+    1. **Data Structure Assessment**: Evaluate the overall structure and organization
+    2. **Data Quality Deep Dive**: Detailed analysis of quality issues and their implications
+    3. **Variable Relationship Insights**: Potential relationships and dependencies between variables
+    4. **Advanced Cleaning Strategies**: Sophisticated approaches for data preparation
+    5. **Analytics Preparation Roadmap**: Step-by-step plan for making data analytics-ready
+    6. **Risk Assessment**: Potential risks and challenges for downstream analytics
+    
+    Focus on actionable, detailed recommendations for a data scientist or analyst.
+    """
+    
+    return prompt
+
+
+def build_profiling_outliers_prompt() -> str:
+    """Build a prompt for profiling-based outlier analysis insights"""
+    if not st.session_state.get('ydata_anomaly_results'):
+        return "No anomaly detection results available from profiling."
+    
+    outlier_data = st.session_state.ydata_anomaly_results
+    total_outliers = sum(info['count'] for info in outlier_data.values())
+    dataset_size = len(st.session_state.data) if st.session_state.data is not None else 1
+    outlier_rate = (total_outliers / dataset_size) * 100
+    
+    # Extract detailed outlier information
+    outlier_summary = []
+    for column, info in outlier_data.items():
+        col_outlier_rate = (info['count'] / dataset_size) * 100
+        outlier_summary.append(f"- {column}: {info['count']} outliers ({col_outlier_rate:.2f}%), method: {info.get('method', 'IQR')}")
+    
+    prompt = f"""
+    Analyze these statistical anomaly detection results from comprehensive data profiling:
+    
+    ANOMALY DETECTION SUMMARY:
+    - Total Outliers Detected: {total_outliers}
+    - Overall Outlier Rate: {outlier_rate:.2f}%
+    - Columns with Outliers: {len(outlier_data)}
+    - Dataset Size: {dataset_size:,} rows
+    
+    DETAILED OUTLIER BREAKDOWN:
+    {chr(10).join(outlier_summary)}
+    
+    Please provide comprehensive analysis covering:
+    1. **Statistical Significance**: Whether these outlier rates are concerning or normal
+    2. **Pattern Analysis**: What patterns or trends the outliers might indicate
+    3. **Business Impact**: How these outliers could affect business insights and decisions
+    4. **Treatment Strategies**: Specific approaches for handling each type of outlier
+    5. **Model Impact Assessment**: How these outliers would affect different types of analytics
+    6. **Investigation Priorities**: Which outliers should be investigated first and why
+    7. **Validation Recommendations**: How to validate whether outliers are errors or legitimate values
+    
+    Provide practical, implementable recommendations for a data analysis team.
+    """
+    
+    return prompt
+
+
+def display_anomaly_analysis_results(parsed_response: dict):
+    """Display structured anomaly analysis results in a user-friendly format"""
+    
+    analysis_summary = parsed_response.get("analysisSummary", {})
+    treatment_strategies = parsed_response.get("treatmentStrategies", {})
+    recommendations = parsed_response.get("recommendations", [])
+    
+    # Analysis Summary Section
+    if analysis_summary:
+        st.subheader("📊 Analysis Summary")
+        
+        # Statistical Significance
+        if "statisticalSignificance" in analysis_summary:
+            st.info(f"**📈 Statistical Significance:** {analysis_summary['statisticalSignificance']}")
+        
+        # Pattern Analysis
+        if "patternAnalysis" in analysis_summary:
+            with st.expander("🔍 Pattern Analysis", expanded=True):
+                st.write(analysis_summary['patternAnalysis'])
+        
+        # Business Impact
+        if "businessImpact" in analysis_summary:
+            with st.expander("💼 Business Impact Assessment", expanded=True):
+                st.write(analysis_summary['businessImpact'])
+        
+        # Model Impact Assessment
+        if "modelImpactAssessment" in analysis_summary:
+            with st.expander("🤖 Model Impact Assessment", expanded=False):
+                st.write(analysis_summary['modelImpactAssessment'])
+        
+        # Investigation Priorities
+        if "investigationPriorities" in analysis_summary:
+            st.subheader("🎯 Investigation Priorities")
+            st.warning(analysis_summary['investigationPriorities'])
+        
+        # Validation Recommendations
+        if "validationRecommendations" in analysis_summary:
+            st.subheader("✅ Validation Recommendations")
+            st.info(analysis_summary['validationRecommendations'])
+    
+    # Treatment Strategies Section
+    if treatment_strategies:
+        st.subheader("🔧 Treatment Strategies")
+        
+        configurable_iqr = treatment_strategies.get("configurableIQR", {})
+        if configurable_iqr:
+            if "description" in configurable_iqr:
+                st.info(f"**Method Context:** {configurable_iqr['description']}")
+            
+            strategies = configurable_iqr.get("strategies", [])
+            if strategies:
+                st.write("**Available Treatment Options:**")
+                
+                for i, strategy in enumerate(strategies):
+                    if isinstance(strategy, dict):
+                        strategy_name = strategy.get("strategyName", f"Strategy {i+1}")
+                        condition = strategy.get("condition", "No condition specified")
+                        action = strategy.get("action", "No action specified")
+                        example = strategy.get("example", "")
+                        
+                        with st.expander(f"🛠️ {strategy_name}", expanded=False):
+                            st.write(f"**When to Use:** {condition}")
+                            st.write(f"**Action:** {action}")
+                            if example:
+                                st.code(f"Example: {example}")
+    
+    # Recommendations Section
+    if recommendations:
+        st.subheader("📋 Action Plan & Recommendations")
+        
+        # Group recommendations by priority
+        high_priority = []
+        medium_priority = []
+        low_priority = []
+        
+        for rec in recommendations:
+            if isinstance(rec, dict):
+                priority = rec.get("priority", "Medium").lower()
+                if priority == "high":
+                    high_priority.append(rec)
+                elif priority == "medium":
+                    medium_priority.append(rec)
+                else:
+                    low_priority.append(rec)
+        
+        # Display by priority
+        if high_priority:
+            st.markdown("#### 🔴 High Priority Actions")
+            for i, rec in enumerate(high_priority, 1):
+                action = rec.get("action", "No action specified")
+                details = rec.get("details", "No details provided")
+                
+                st.error(f"**{i}. {action}**")
+                st.write(f"📝 {details}")
+                st.markdown("---")
+        
+        if medium_priority:
+            st.markdown("#### 🟡 Medium Priority Actions")
+            for i, rec in enumerate(medium_priority, 1):
+                action = rec.get("action", "No action specified")
+                details = rec.get("details", "No details provided")
+                
+                st.warning(f"**{i}. {action}**")
+                st.write(f"📝 {details}")
+                st.markdown("---")
+        
+        if low_priority:
+            st.markdown("#### 🟢 Low Priority Actions")
+            for i, rec in enumerate(low_priority, 1):
+                action = rec.get("action", "No action specified")
+                details = rec.get("details", "No details provided")
+                
+                st.info(f"**{i}. {action}**")
+                st.write(f"📝 {details}")
+                if i < len(low_priority):  # Don't add separator after last item
+                    st.markdown("---")
+    
+    # Summary Call-to-Action
+    st.markdown("---")
+    st.success("💡 **Next Steps:** Follow the high-priority recommendations first, then work through medium and low priority items based on your project timeline and resources.")
+
+
+def display_data_profiling_insights(insights: dict):
+    """Display structured data profiling insights in a user-friendly format"""
+    
+    # Dataset Overview Section
+    dataset_overview = insights.get("dataset_overview", {})
+    if dataset_overview:
+        st.subheader("📊 Dataset Overview")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            total_vars = dataset_overview.get("total_variables", 0)
+            st.metric("Total Variables", total_vars)
+        with col2:
+            total_obs = dataset_overview.get("total_observations", 0)
+            st.metric("Total Observations", f"{total_obs:,}")
+        with col3:
+            missing_pct = dataset_overview.get("missing_data_percentage", 0)
+            st.metric("Missing Data", f"{missing_pct}%")
+        with col4:
+            dup_pct = dataset_overview.get("duplicate_rows_percentage", 0)
+            st.metric("Duplicates", f"{dup_pct}%")
+        
+        # Variable type distribution
+        var_types = dataset_overview.get("variable_type_distribution", {})
+        if var_types:
+            st.write("**Variable Type Distribution:**")
+            type_cols = st.columns(len(var_types))
+            for i, (var_type, count) in enumerate(var_types.items()):
+                with type_cols[i]:
+                    st.metric(f"{var_type} Variables", count)
+        
+        # Initial assessment
+        if "initial_assessment" in dataset_overview:
+            st.info(f"**Initial Assessment:** {dataset_overview['initial_assessment']}")
+    
+    # Data Structure Assessment
+    data_structure = insights.get("data_structure_assessment", {})
+    if data_structure and "recommendations" in data_structure:
+        st.subheader("🏗️ Data Structure Assessment")
+        display_recommendations_by_priority(data_structure["recommendations"], "Structure")
+    
+    # Data Quality Deep Dive
+    data_quality = insights.get("data_quality_deep_dive", {})
+    if data_quality and "recommendations" in data_quality:
+        st.subheader("🔍 Data Quality Deep Dive")
+        display_recommendations_by_priority(data_quality["recommendations"], "Quality")
+    
+    # Variable Relationship Insights
+    var_relationships = insights.get("variable_relationship_insights", {})
+    if var_relationships and "recommendations" in var_relationships:
+        st.subheader("🔗 Variable Relationship Insights")
+        display_recommendations_by_priority(var_relationships["recommendations"], "Relationships")
+    
+    # Advanced Cleaning Strategies
+    cleaning_strategies = insights.get("advanced_cleaning_strategies", {})
+    if cleaning_strategies and "recommendations" in cleaning_strategies:
+        st.subheader("🧹 Advanced Cleaning Strategies")
+        display_recommendations_by_priority(cleaning_strategies["recommendations"], "Cleaning")
+    
+    # Analytics Preparation Roadmap
+    roadmap = insights.get("analytics_preparation_roadmap", {})
+    if roadmap and "steps" in roadmap:
+        st.subheader("🗺️ Analytics Preparation Roadmap")
+        
+        steps = roadmap["steps"]
+        for step in steps:
+            step_num = step.get("step_number", "")
+            description = step.get("description", "")
+            deliverable = step.get("deliverable", "")
+            
+            with st.expander(f"📋 Step {step_num}: {description.split(':')[0]}", expanded=False):
+                st.write(f"**Task:** {description}")
+                st.write(f"**Deliverable:** {deliverable}")
+    
+    # Risk Assessment
+    risk_assessment = insights.get("risk_assessment", {})
+    if risk_assessment and "potential_risks" in risk_assessment:
+        st.subheader("⚠️ Risk Assessment")
+        
+        risks = risk_assessment["potential_risks"]
+        for i, risk in enumerate(risks, 1):
+            risk_name = risk.get("risk", f"Risk {i}")
+            description = risk.get("description", "")
+            mitigation = risk.get("mitigation", "")
+            
+            with st.expander(f"🚨 {risk_name}", expanded=False):
+                st.write(f"**Description:** {description}")
+                if mitigation:
+                    st.write(f"**Mitigation:** {mitigation}")
+
+
+def display_recommendations_by_priority(recommendations: list, section_name: str):
+    """Display recommendations grouped by priority level"""
+    
+    # Group recommendations by priority
+    high_priority = []
+    medium_priority = []
+    low_priority = []
+    
+    for rec in recommendations:
+        priority = rec.get("priority", "Medium").lower()
+        if priority == "high":
+            high_priority.append(rec)
+        elif priority == "medium":
+            medium_priority.append(rec)
+        else:
+            low_priority.append(rec)
+    
+    # Display by priority
+    if high_priority:
+        st.markdown("#### 🔴 High Priority")
+        for i, rec in enumerate(high_priority, 1):
+            area = rec.get("area", "General")
+            action = rec.get("action", "No action specified")
+            rationale = rec.get("rationale", "No rationale provided")
+            
+            with st.expander(f"🎯 {area}", expanded=True):
+                st.error(f"**Action:** {action}")
+                st.write(f"**Rationale:** {rationale}")
+    
+    if medium_priority:
+        st.markdown("#### 🟡 Medium Priority")
+        for i, rec in enumerate(medium_priority, 1):
+            area = rec.get("area", "General")
+            action = rec.get("action", "No action specified")
+            rationale = rec.get("rationale", "No rationale provided")
+            
+            with st.expander(f"⚡ {area}", expanded=False):
+                st.warning(f"**Action:** {action}")
+                st.write(f"**Rationale:** {rationale}")
+    
+    if low_priority:
+        st.markdown("#### 🟢 Low Priority")
+        for i, rec in enumerate(low_priority, 1):
+            area = rec.get("area", "General")
+            action = rec.get("action", "No action specified")
+            rationale = rec.get("rationale", "No rationale provided")
+            
+            with st.expander(f"📌 {area}", expanded=False):
+                st.info(f"**Action:** {action}")
+                st.write(f"**Rationale:** {rationale}")
