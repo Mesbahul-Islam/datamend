@@ -1445,6 +1445,17 @@ def build_profiling_prompt() -> str:
     4. Prioritized action items
     
     Focus on practical, actionable advice for a data analyst.
+    
+    Return your response as a valid JSON object with the following structure:
+    {{
+        "data_quality_assessment": {{
+            "overall_assessment": "A brief summary of data quality",
+            "key_concerns_and_risks": ["List of key concerns", "List of risks"]
+        }},
+        "data_cleaning_recommendations": ["Recommendation 1", "Recommendation 2"],
+        "prioritized_action_items": ["High priority item 1", "Medium priority item 2"]
+    }}
+    Do not include any text outside the JSON object.
     """
     
     return prompt
@@ -1479,6 +1490,19 @@ def build_outliers_prompt() -> str:
     Explain in terms a business analyst would understand.
     """
     
+    prompt += """
+
+    Return your response as a valid JSON object with the following structure:
+    {
+        "data_quality_assessment": {
+            "overall_assessment": "A brief summary of data quality",
+            "key_concerns_and_risks": ["List of key concerns", "List of risks"]
+        },
+        "data_cleaning_recommendations": ["Recommendation 1", "Recommendation 2"],
+        "prioritized_action_items": ["High priority item 1", "Medium priority item 2"]
+    }
+    Do not include any text outside the JSON object.
+    """
     return prompt
 
 
@@ -1512,6 +1536,21 @@ def build_lineage_prompt() -> str:
     Focus on actionable data governance recommendations.
     """
     
+    prompt += """
+
+    Return your response as a valid JSON object with the following structure:
+    {
+        "data_quality_assessment": {
+            "overall_assessment": "A brief summary of data quality",
+            "key_concerns_and_risks": ["List of key concerns", "List of risks"]
+        },
+        "data_cleaning_recommendations": ["Recommendation 1", "Recommendation 2"],
+        "prioritized_action_items": ["High priority item 1", "Medium priority item 2"]
+    }
+    Do not include any text outside the JSON object.
+    """
+
+
     return prompt
 
 
@@ -1536,42 +1575,49 @@ def display_contextual_recommendations(raw_response: str, context: str):
     if raw_response:
         cleaned_response = raw_response.strip()
         
-        # Remove markdown code block markers if present
+        # Remove markdown code blocks
         if cleaned_response.startswith('```json'):
-            cleaned_response = cleaned_response[7:]  # Remove ```json
+            cleaned_response = cleaned_response[7:]
         if cleaned_response.startswith('```'):
-            cleaned_response = cleaned_response[3:]   # Remove ```
+            cleaned_response = cleaned_response[3:]
         if cleaned_response.endswith('```'):
-            cleaned_response = cleaned_response[:-3]  # Remove trailing ```
-        
+            cleaned_response = cleaned_response[:-3]
         cleaned_response = cleaned_response.strip()
         
-        # Try to parse as JSON first
         try:
             import json
             parsed = json.loads(cleaned_response)
             
-            # Check if it's the structured data quality assessment format
-            if "data_quality_assessment" in parsed:
-                display_structured_assessment(parsed["data_quality_assessment"])
-            elif "data_profiling_insights" in parsed:
-                # Handle detailed data profiling insights format
-                display_data_profiling_insights(parsed["data_profiling_insights"])
-            elif "analysisSummary" in parsed and "treatmentStrategies" in parsed and "recommendations" in parsed:
-                # Handle anomaly detection analysis format
+            # Route to specific display functions based on context
+            if context == "profiling" and "data_quality_assessment" in parsed:
+                display_structured_assessment(parsed)
+            elif context == "outliers" and "analysisSummary" in parsed:
                 display_anomaly_analysis_results(parsed)
-            elif "data_cleaning_recommendations" in parsed:
-                # Handle case where the response has the recommendations at the top level
+            elif context == "profiling" and ("data_cleaning_recommendations" in parsed or "prioritized_action_items" in parsed):
+                # Handle profiling responses that might not have nested structure
                 display_structured_assessment(parsed)
             else:
-                # Display as formatted JSON
-                st.json(parsed)
+                # Try to display as structured assessment if it has the right keys
+                if any(key in parsed for key in ["data_quality_assessment", "data_cleaning_recommendations", "prioritized_action_items"]):
+                    display_structured_assessment(parsed)
+                else:
+                    st.json(parsed)  # Fallback to raw JSON display
                 
         except json.JSONDecodeError as e:
-            # If not JSON, display as markdown text
-            st.markdown(cleaned_response)
+            st.error(f"Failed to parse JSON response: {str(e)}")
+            st.code(cleaned_response)  # Show raw response for debugging
+            # Fallback: Parse and structure as markdown sections
+            st.markdown("### Structured Response")
+            sections = cleaned_response.split('\n\n')  # Split by double newlines
+            for section in sections:
+                if ':' in section:
+                    title, content = section.split(':', 1)
+                    st.subheader(title.strip())
+                    st.write(content.strip())
+                else:
+                    st.write(section.strip())
     else:
-        st.warning("No AI insights were generated. Please try again or check your API configuration.")
+        st.warning("No response available.")
 
 
 def display_structured_assessment(assessment: dict):
@@ -1598,43 +1644,119 @@ def display_structured_assessment(assessment: dict):
         st.subheader("⚠️ Key Concerns and Risks")
         
         for i, concern in enumerate(assessment_data["key_concerns_and_risks"], 1):
-            with st.expander(f"🔴 {concern.get('concern', f'Concern {i}')}"):
-                st.write(f"**Risk:** {concern.get('risk', 'No risk description provided')}")
-                st.write(f"**Mitigation:** {concern.get('mitigation', 'No mitigation strategy provided')}")
+            if isinstance(concern, str):
+                st.write(f"{i}. {concern}")
+            elif isinstance(concern, dict):
+                with st.expander(f"🔴 {concern.get('concern', f'Concern {i}')}"):
+                    st.write(f"**Risk:** {concern.get('risk', 'No risk description provided')}")
+                    st.write(f"**Mitigation:** {concern.get('mitigation', 'No mitigation strategy provided')}")
     
     # Data Cleaning Recommendations
     if recommendations:
         st.subheader("🧹 Data Cleaning Recommendations")
         
         for rec in recommendations:
-            priority = rec.get('priority', 'Medium')
-            priority_color = {
-                'High': '🔴',
-                'Medium': '🟡', 
-                'Low': '🟢'
-            }.get(priority, '🟡')
-            
-            variable = rec.get('variable', 'Not specified')
-            issue = rec.get('issue', rec.get('action', 'Action'))
-            
-            with st.expander(f"{priority_color} {variable}: {issue} - {priority} Priority"):
-                if 'recommendation' in rec:
-                    st.write(f"**Recommendation:** {rec['recommendation']}")
-                elif 'details' in rec:
-                    st.write(f"**Details:** {rec['details']}")
+            if isinstance(rec, str):
+                # Parse string format: e.g., "**High Priority:** Address missing values..." or "High: Address missing values..."
+                if "**" in rec and ":**" in rec:
+                    # Handle "**High Priority:** ..." format
+                    try:
+                        priority_part, action = rec.split(":**", 1)
+                        priority = priority_part.replace("**", "").strip()
+                        # Extract just the priority level (High, Medium, Low)
+                        if "Priority" in priority:
+                            priority = priority.replace("Priority", "").strip()
+                        action = action.strip()
+                        
+                        priority_color = {
+                            'High': '🔴',
+                            'Medium': '🟡', 
+                            'Low': '🟢'
+                        }.get(priority, '🟡')
+                        
+                        with st.expander(f"{priority_color} {action} - {priority} Priority"):
+                            st.write(f"**Recommendation:** {action}")
+                    except ValueError:
+                        # Fallback if parsing fails
+                        st.write(f"• {rec}")
+                elif ": " in rec:
+                    # Handle "High: Address missing values..." format
+                    priority, action = rec.split(": ", 1)
+                    priority_color = {
+                        'High': '🔴',
+                        'Medium': '🟡', 
+                        'Low': '🟢'
+                    }.get(priority, '🟡')
+                    with st.expander(f"{priority_color} {action} - {priority} Priority"):
+                        st.write(f"**Recommendation:** {action}")
+                else:
+                    st.write(f"• {rec}")
+            elif isinstance(rec, dict):
+                priority = rec.get('priority', 'Medium')
+                priority_color = {
+                    'High': '🔴',
+                    'Medium': '🟡', 
+                    'Low': '🟢'
+                }.get(priority, '🟡')
+                
+                variable = rec.get('variable', 'Not specified')
+                issue = rec.get('issue', rec.get('action', 'Action'))
+                
+                with st.expander(f"{priority_color} {variable}: {issue} - {priority} Priority"):
+                    if 'recommendation' in rec:
+                        st.write(f"**Recommendation:** {rec['recommendation']}")
+                    elif 'details' in rec:
+                        st.write(f"**Details:** {rec['details']}")
     
     # Prioritized Action Items
     if action_items:
         st.subheader("📋 Prioritized Action Plan")
         
         for item in action_items:
-            priority = item.get('priority', 0)
-            action = item.get('action', 'No action specified')
-            rationale = item.get('rationale', 'No rationale provided')
-            
-            st.write(f"**{priority}.** {action}")
-            st.caption(f"💡 Rationale: {rationale}")
-            st.markdown("---")
+            if isinstance(item, str):
+                # Parse string format: e.g., "**High Priority:** Address missing values..." or "High: Address missing values..."
+                if "**" in item and ":**" in item:
+                    # Handle "**High Priority:** ..." format
+                    try:
+                        priority_part, action = item.split(":**", 1)
+                        priority = priority_part.replace("**", "").strip()
+                        # Extract just the priority level (High, Medium, Low)
+                        if "Priority" in priority:
+                            priority = priority.replace("Priority", "").strip()
+                        action = action.strip()
+                        
+                        priority_icon = {
+                            'High': '🔴',
+                            'Medium': '🟡',
+                            'Low': '🟢'
+                        }.get(priority, '🟡')
+                        
+                        st.write(f"{priority_icon} **{action}**")
+                        st.caption(f"Priority: {priority}")
+                    except ValueError:
+                        # Fallback if parsing fails
+                        st.write(f"• {item}")
+                elif ": " in item:
+                    # Handle "High: Address missing values..." format
+                    priority, action = item.split(": ", 1)
+                    priority_icon = {
+                        'High': '🔴',
+                        'Medium': '🟡',
+                        'Low': '🟢'
+                    }.get(priority, '🟡')
+                    st.write(f"{priority_icon} **{action}**")
+                    st.caption(f"Priority: {priority}")
+                else:
+                    st.write(f"• {item}")
+                st.markdown("---")
+            elif isinstance(item, dict):
+                priority = item.get('priority', 0)
+                action = item.get('action', 'No action specified')
+                rationale = item.get('rationale', 'No rationale provided')
+                
+                st.write(f"**{priority}.** {action}")
+                st.caption(f"💡 Rationale: {rationale}")
+                st.markdown("---")
 
 
 def display_analytics_suitability_ai_section():
@@ -1949,6 +2071,20 @@ def build_detailed_profiling_prompt() -> str:
     6. **Risk Assessment**: Potential risks and challenges for downstream analytics
     
     Focus on actionable, detailed recommendations for a data scientist or analyst.
+    """
+
+    prompt += """
+
+    Return your response as a valid JSON object with the following structure:
+    {
+        "data_quality_assessment": {
+            "overall_assessment": "A brief summary of data quality",
+            "key_concerns_and_risks": ["List of key concerns", "List of risks"]
+        },
+        "data_cleaning_recommendations": ["Recommendation 1", "Recommendation 2"],
+        "prioritized_action_items": ["High priority item 1", "Medium priority item 2"]
+    }
+    Do not include any text outside the JSON object.
     """
     
     return prompt
