@@ -11,6 +11,8 @@ A modular data quality management interface focused on:
 import streamlit as st
 import sys
 import os
+import oracledb
+
 
 # Add src to path for imports
 # Add parent directory to Python path
@@ -38,6 +40,23 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+def handle_sidebar_oracle_connection():
+    st.subheader("Oracle Cloud Connection")
+    username = st.text_input("Username", help="Enter your Oracle Cloud username")
+    password = st.text_input("Password", type="password", help="Enter your Oracle Cloud password")
+    host = st.text_input("Host", help="Enter your Oracle Cloud host")
+    port = st.text_input("Port", value="1521", help="Enter your Oracle Cloud port")
+    service_name = st.text_input("Service Name", help="Enter your Oracle Cloud service name")
+
+    if st.button("Connect to Oracle Cloud"):
+        try:
+            # Create a connection to Oracle Cloud
+            dsn = f"{host}:{port}/{service_name}"
+            connection = oracledb.connect(user=username, password=password, dsn=dsn)
+            st.session_state['oracle_connection'] = connection
+            st.success("Connected to Oracle Cloud successfully!")
+        except Exception as e:
+            st.error(f"Failed to connect to Oracle Cloud: {e}")
 
 def main():
     """Main application function"""
@@ -56,10 +75,11 @@ def main():
             st.success("Snowflake Connected")
         
         # Data source selection
+        # Data source selection
         st.subheader("Select Data Source")
         source_type = st.selectbox(
             "Choose data source type:",
-            ["CSV Files", "Excel Files", "Snowflake Database"],
+            ["CSV Files", "Excel Files", "Snowflake Database", "Oracle Cloud"],
             help="Select the type of data you want to upload"
         )
         
@@ -68,8 +88,10 @@ def main():
             handle_sidebar_csv_upload()
         elif source_type == "Excel Files":
             handle_sidebar_excel_upload()
-        else:  # Snowflake Database
+        elif source_type == "Snowflake Database":
             handle_sidebar_snowflake_connection()
+        elif source_type == "Oracle Cloud":
+            handle_sidebar_oracle_connection()
         
         # Configuration section
         st.markdown("---")

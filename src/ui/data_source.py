@@ -48,6 +48,49 @@ def data_source_tab():
         st.markdown("---")
         handle_snowflake_data_loading()
 
+def handle_oracle_connection():
+    """Handle Oracle Cloud connection setup"""
+    st.subheader("☁️ Oracle Cloud Database")
+    
+    with st.form("oracle_connection"):
+        st.markdown("### Oracle Connection Details")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            username = st.text_input("Username")
+            password = st.text_input("Password", type="password")
+            
+        with col2:
+            dsn = st.text_input("TNS Name/Connection String", 
+                help="e.g., mydb_high")
+            wallet_location = st.text_input("Wallet Directory (Optional)",
+                help="Path to Oracle Wallet directory")
+            
+        connect_button = st.form_submit_button("Connect to Oracle", type="primary")
+        
+        if connect_button:
+            if not all([username, password, dsn]):
+                st.error("❌ Please fill in all required fields")
+                return
+                
+            try:
+                connector = DataConnectorFactory.create_connector(
+                    'oracle',
+                    username=username,
+                    password=password,
+                    dsn=dsn,
+                    wallet_location=wallet_location if wallet_location else None
+                )
+                
+                if connector.connect():
+                    st.success("✅ Successfully connected to Oracle Cloud!")
+                    st.session_state.oracle_connector = connector
+                    st.session_state.oracle_connected = True
+                else:
+                    st.error("❌ Failed to connect to Oracle")
+            except Exception as e:
+                st.error(f"❌ Connection error: {str(e)}")
+
 
 def handle_csv_upload():
     """Simplified CSV file upload interface"""
