@@ -1130,26 +1130,42 @@ def run_quality_analysis(df: pd.DataFrame):
                     recommendation="Clean and standardize data types before analytics"
                 ))
             
-            # Calculate overall quality score (more strict scoring)
+            # Calculate overall quality score (strict scoring)
             critical_count = len([i for i in issues if i.severity == "critical"])
             high_count = len([i for i in issues if i.severity == "high"])
             medium_count = len([i for i in issues if i.severity == "medium"])
             
-            # More strict scoring: Critical issues have major impact, high issues are significant
-            score = max(0, 100 - (critical_count * 50) - (high_count * 30) - (medium_count * 15))
+            # Strict scoring: Each issue type significantly impacts score
+            score = 100
             
-            # Additional penalties for multiple issues
-            total_issues = len(issues)
-            if total_issues > 5:
-                score = max(0, score - ((total_issues - 5) * 5))  # Extra penalty for many issues
-            
-            # Cap score at 85 if any critical issues exist (never "excellent" with critical issues)
+            # Critical issues are deal-breakers - heavily penalized
             if critical_count > 0:
-                score = min(score, 85)
+                score = max(0, score - (critical_count * 70))  # 70 points per critical issue
             
-            # Cap score at 90 if any high issues exist
+            # High issues are serious problems
             if high_count > 0:
-                score = min(score, 90)
+                score = max(0, score - (high_count * 40))  # 40 points per high issue
+            
+            # Medium issues accumulate
+            if medium_count > 0:
+                score = max(0, score - (medium_count * 20))  # 20 points per medium issue
+            
+            # Additional penalties for multiple issues (complexity penalty)
+            total_issues = len(issues)
+            if total_issues > 3:
+                score = max(0, score - ((total_issues - 3) * 10))  # 10 points per additional issue beyond 3
+            
+            # Strict caps: No excellent scores with any critical issues
+            if critical_count > 0:
+                score = min(score, 40)  # Max 40 with critical issues
+            
+            # No good scores with multiple high issues
+            if high_count >= 2:
+                score = min(score, 60)  # Max 60 with 2+ high issues
+            
+            # Cap at 75 with any high issues
+            if high_count > 0:
+                score = min(score, 75)
             
             results = {
                 "quality_score": score,
@@ -1165,22 +1181,22 @@ def run_quality_analysis(df: pd.DataFrame):
 
 def display_quality_analysis_results(results: Dict[str, Any]):
     """Display the results of quality analysis"""
-    st.subheader(" Analytics Quality Report")
+    st.subheader("Analytics Quality Report")
     
     quality_score = results.get("quality_score", 0)
     issues = results.get("issues", [])
     
-    # Quality score display with more realistic thresholds
+    # Quality score display with strict thresholds
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        if quality_score >= 90:
+        if quality_score >= 85:
             st.metric("Analytics Quality Score", f"{quality_score}/100", delta="Excellent", delta_color="normal")
-        elif quality_score >= 75:
+        elif quality_score >= 70:
             st.metric("Analytics Quality Score", f"{quality_score}/100", delta="Good", delta_color="normal")
-        elif quality_score >= 60:
+        elif quality_score >= 50:
             st.metric("Analytics Quality Score", f"{quality_score}/100", delta="Fair", delta_color="off")
-        elif quality_score >= 40:
+        elif quality_score >= 30:
             st.metric("Analytics Quality Score", f"{quality_score}/100", delta="Poor", delta_color="inverse")
         else:
             st.metric("Analytics Quality Score", f"{quality_score}/100", delta="Critical", delta_color="inverse")
@@ -1193,24 +1209,24 @@ def display_quality_analysis_results(results: Dict[str, Any]):
         total_issues = len(issues)
         st.metric("Total Issues", total_issues)
     
-    # More realistic overall assessment
-    if quality_score >= 90:
-        st.success(" Excellent data quality - Ready for advanced analytics with minimal preprocessing.")
-    elif quality_score >= 75:
-        st.info("✅ Good data quality - Suitable for most analytics with minor cleanup.")
-    elif quality_score >= 60:
-        st.warning("⚠️ Fair data quality - Requires moderate cleanup before reliable analytics.")
-    elif quality_score >= 40:
-        st.warning(" Poor data quality - Significant preprocessing needed before analytics.")
+    # Strict overall assessment
+    if quality_score >= 85:
+        st.success("Excellent data quality - Ready for advanced analytics with minimal preprocessing.")
+    elif quality_score >= 70:
+        st.info("Good data quality - Suitable for most analytics with minor cleanup.")
+    elif quality_score >= 50:
+        st.warning("Fair data quality - Requires moderate cleanup before reliable analytics.")
+    elif quality_score >= 30:
+        st.warning("Poor data quality - Significant preprocessing needed before analytics.")
     else:
-        st.error("❌ Critical data quality issues - Major remediation required before any analytics.")
+        st.error("Critical data quality issues - Major remediation required before any analytics.")
     
     # Always recommend AI analysis for deeper insights
-    st.info(" **Recommendation**: Use the 'AI Analytics Suitability Assessment' below for deeper insights and specific recommendations based on these quality metrics.")
+    st.info("**Recommendation**: Use the 'AI Analytics Suitability Assessment' below for deeper insights and specific recommendations based on these quality metrics.")
     
     # Issues breakdown
     if issues:
-        st.subheader(" Issues RequiringAttention")
+        st.subheader("Issues Requiring Attention")
         
         # Group issues by severity
         critical_issues = [i for i in issues if i.severity == "critical"]
@@ -1221,7 +1237,7 @@ def display_quality_analysis_results(results: Dict[str, Any]):
         if critical_issues:
             st.markdown("**Critical Issues (Must Fix)**")
             for issue in critical_issues:
-                with st.expander(f" {issue.title}"):
+                with st.expander(f"{issue.title}"):
                     st.write(f"**Impact:** {issue.description}")
                     st.write(f"**Affected Columns:** `{', '.join(issue.affected_columns)}`")
                     st.write(f"**Recommendation:** {issue.recommendation}")
@@ -1229,7 +1245,7 @@ def display_quality_analysis_results(results: Dict[str, Any]):
         if high_issues:
             st.markdown("**High Priority Issues**")
             for issue in high_issues:
-                with st.expander(f" {issue.title}"):
+                with st.expander(f"{issue.title}"):
                     st.write(f"**Impact:** {issue.description}")
                     st.write(f"**Affected Columns:** `{', '.join(issue.affected_columns)}`")
                     st.write(f"**Recommendation:** {issue.recommendation}")
@@ -1237,7 +1253,7 @@ def display_quality_analysis_results(results: Dict[str, Any]):
         if medium_issues:
             st.markdown("**Medium Priority Issues**")
             for issue in medium_issues:
-                with st.expander(f" {issue.title}"):
+                with st.expander(f"{issue.title}"):
                     st.write(f"**Impact:** {issue.description}")
                     st.write(f"**Affected Columns:** `{', '.join(issue.affected_columns)}`")
                     st.write(f"**Recommendation:** {issue.recommendation}")
@@ -1245,7 +1261,7 @@ def display_quality_analysis_results(results: Dict[str, Any]):
         st.success("No quality issues detected! Your data is ready for analytics.")
     
     # Export quality report
-    if st.button(" Export Quality Report", key="export_quality_report"):
+    if st.button("Export Quality Report", key="export_quality_report"):
         export_quality_report(results)
 
 
@@ -1500,10 +1516,9 @@ def build_outliers_prompt() -> str:
 
 def build_lineage_prompt() -> str:
     """Build a prompt for data lineage insights"""
-    if not st.session_state.get('lineage_data') or st.session_state.lineage_data.empty:
+    lineage_data = st.session_state.get('lineage_data')
+    if lineage_data is None or lineage_data.empty:
         return "No lineage data available."
-    
-    lineage_data = st.session_state.lineage_data
     
     # Extract key information
     query_types = lineage_data.get('QUERY_TYPE', pd.Series()).value_counts().to_dict() if 'QUERY_TYPE' in lineage_data.columns else {}
@@ -1552,10 +1567,10 @@ def display_contextual_recommendations(raw_response: str, context: str):
         icon = ""
         title = "Data Profiling Insights"
     elif context == "outliers":
-        icon = "🎯"
+        icon = ""
         title = "Outlier Analysis Explanation"
     elif context == "lineage":
-        icon = "🔗"
+        icon = ""
         title = "Data Lineage Analysis"
     else:
         icon = ""
@@ -1795,10 +1810,10 @@ def display_analytics_suitability_ai_section():
     
     # Only show if LLM configuration exists and has an API key
     if not llm_config or not llm_config.get('api_key'):
-        st.warning(" AI Analytics Suitability Assessment available! Enable AI in the sidebar and add your API key to get intelligent analytics readiness insights.")
+        st.warning("AI Analytics Suitability Assessment available! Enable AI in the sidebar and add your API key to get intelligent analytics readiness insights.")
         return
     
-    st.subheader(" AI Analytics Suitability Assessment")
+    st.subheader("AI Analytics Suitability Assessment")
     st.write("Get AI-powered assessment of whether your data is suitable for analytics and machine learning based on quality analysis results.")
     st.caption(" Powered by AI - Analyzes quality metrics to make data readiness decisions")
     
@@ -1838,7 +1853,7 @@ def generate_analytics_suitability_assessment(llm_config: dict):
     try:
         from src.llm.analyzer import DataQualityLLMAnalyzer, LLMConfig
         
-        with st.spinner("🔍 AI analyzing data quality metrics for analytics suitability..."):
+        with st.spinner("AI analyzing data quality metrics for analytics suitability..."):
             config = LLMConfig(
                 provider=llm_config.get('provider', 'openai'),
                 model=llm_config.get('model', 'gpt-3.5-turbo'),
@@ -1893,8 +1908,7 @@ def build_analytics_suitability_prompt() -> str:
     prompt = f"""
     As a data analytics expert, assess whether this dataset is suitable for analytics and machine learning based on the following quality analysis:
 
-    QUALITY METRICS:
-    - Overall Quality Score: {quality_score}/100
+    QUALITY ANALYSIS RESULTS:
     - Total Issues Found: {len(issues)}
     - Critical Issues: {len(critical_issues)}
     - High Priority Issues: {len(high_issues)}
@@ -1936,7 +1950,7 @@ def build_analytics_suitability_prompt() -> str:
 
 def display_analytics_suitability_results(raw_response: str):
     """Display analytics suitability assessment results"""
-    st.subheader(" Analytics Readiness Assessment")
+    st.subheader("Analytics Readiness Assessment")
     
     if not raw_response:
         st.warning("No assessment results available.")

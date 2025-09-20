@@ -13,7 +13,7 @@ from src.ui.data_profiling import display_ai_recommendations_section
 
 def anomaly_detection_tab(anomaly_threshold: float):
     """Statistical anomaly analysis results - powered by ydata-profiling"""
-    st.header("📊 Statistical Anomaly Analysis")
+    st.subheader("📊 Statistical Anomaly Analysis")
     
     # Clear explanation of what this tab does
     st.info("🎯 **Purpose:** View and analyze statistical anomalies detected in your data using ydata-profiling's IQR method. "
@@ -68,7 +68,7 @@ def anomaly_detection_tab(anomaly_threshold: float):
 
 def display_ydata_anomaly_results(anomalies_info, df: pd.DataFrame):
     """Display ydata-profiling statistical anomaly results with visualizations"""
-    st.subheader("📊 Statistical Anomaly Analysis Results")
+    st.subheader(" Statistical Anomaly Analysis Results")
     
     if not anomalies_info:
         st.success("🟢 Excellent! No statistical anomalies detected by ydata-profiling.")
@@ -80,14 +80,14 @@ def display_ydata_anomaly_results(anomalies_info, df: pd.DataFrame):
     
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("Total Anomalies", f"{total_anomalies:,}")
+        st.write("Total Anomalies", f"{total_anomalies:,}")
     with col2:
-        st.metric("Affected Columns", len(anomalies_info))
+        st.write("Affected Columns", len(anomalies_info))
     with col3:
-        st.metric("Anomaly Rate", f"{anomaly_rate:.2f}%")
+        st.write("Anomaly Rate", f"{anomaly_rate:.2f}%")
     with col4:
         severity = "🔴 High" if anomaly_rate > 10 else "🟡 Medium" if anomaly_rate > 1 else "🟢 Low"
-        st.metric("Severity Level", severity)
+        st.write("Severity Level", severity)
     
     # Create visualizations for each column with anomalies
     for column, info in anomalies_info.items():

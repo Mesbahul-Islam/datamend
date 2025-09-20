@@ -670,7 +670,7 @@ def display_lineage_table(lineage_data: pd.DataFrame):
                 ]
                 
                 if not transformation_queries.empty:
-                    st.write("**🔄 Transformation Operations:**")
+                    st.write("** Transformation Operations:**")
                     for idx, row in transformation_queries.iterrows():
                         query_type = row.get('QUERY_TYPE', 'Unknown')
                         timestamp = row.get('QUERY_START_TIME', 'Unknown time')
