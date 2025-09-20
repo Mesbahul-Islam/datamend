@@ -8,7 +8,7 @@ import pandas as pd
 from typing import Dict, List, Any, Optional
 
 # Import our modules
-from .utils import get_dataset_dataframe, get_dataset_source_type, get_source_metadata, get_change_type_emoji
+from .utils import get_dataset_source_type, get_source_metadata, get_change_type_emoji
 from .visualizations import (
     create_metadata_comparison_charts, 
     display_change_details, 
@@ -30,10 +30,7 @@ from src.metadata.metadata_extractor import (
 
 def run_metadata_comparison(df1: pd.DataFrame, df2: pd.DataFrame, 
                           name1: str, name2: str,
-                          analysis_type: str, include_content_hash: bool, 
-                          sample_size: int, quality_threshold: float, 
-                          statistical_threshold: float, export_metadata: bool, 
-                          show_hashes: bool):
+                          export_metadata: bool, show_hashes: bool):
     """
     Run metadata-based comparison analysis between two datasets
     
@@ -42,11 +39,6 @@ def run_metadata_comparison(df1: pd.DataFrame, df2: pd.DataFrame,
         df2: Second dataset DataFrame
         name1: Name of first dataset
         name2: Name of second dataset
-        analysis_type: Type of analysis to perform
-        include_content_hash: Whether to include content fingerprinting
-        sample_size: Number of rows to sample for content analysis
-        quality_threshold: Minimum quality score change to flag
-        statistical_threshold: Minimum statistical change to flag
         export_metadata: Whether to export metadata to JSON
         show_hashes: Whether to show hash details
     """
@@ -58,7 +50,7 @@ def run_metadata_comparison(df1: pd.DataFrame, df2: pd.DataFrame,
             source_meta2 = get_source_metadata(name2)
             
             # Extract metadata from both datasets
-            extractor = MetadataExtractor(sample_size=sample_size)
+            extractor = MetadataExtractor()
             
             source_type1 = get_dataset_source_type(name1)
             source_type2 = get_dataset_source_type(name2)
@@ -73,14 +65,7 @@ def run_metadata_comparison(df1: pd.DataFrame, df2: pd.DataFrame,
             st.session_state.metadata_comparison_result = {
                 'metadata1': metadata1,
                 'metadata2': metadata2,
-                'comparison': comparison_result,
-                'analysis_config': {
-                    'analysis_type': analysis_type,
-                    'include_content_hash': include_content_hash,
-                    'sample_size': sample_size,
-                    'quality_threshold': quality_threshold,
-                    'statistical_threshold': statistical_threshold
-                }
+                'comparison': comparison_result
             }
             
             # Display results
@@ -128,7 +113,12 @@ def display_metadata_comparison_results(metadata1: DatasetMetadata, metadata2: D
         st.metric("Total Changes", num_changes)
     
     with col3:
-        quality_diff = metadata2.data_quality_score - metadata1.data_quality_score
+        # Calculate simple quality metric based on null percentage
+        total_cells1 = metadata1.row_count * metadata1.column_count
+        total_cells2 = metadata2.row_count * metadata2.column_count
+        quality1 = 100 - (metadata1.total_null_count / total_cells1 * 100) if total_cells1 > 0 else 100
+        quality2 = 100 - (metadata2.total_null_count / total_cells2 * 100) if total_cells2 > 0 else 100
+        quality_diff = quality2 - quality1
         st.metric("Quality Change", f"{quality_diff:+.1f}%", delta=f"{quality_diff:+.1f}%")
     
     with col4:

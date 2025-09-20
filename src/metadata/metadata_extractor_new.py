@@ -34,11 +34,6 @@ class DatasetMetadata:
     column_names: List[str]
     column_types: Dict[str, str]
     
-    # Column type lists
-    numeric_columns: List[str]
-    categorical_columns: List[str]
-    datetime_columns: List[str]
-    
     # Data quality metrics
     total_null_count: int
     
@@ -68,20 +63,6 @@ class MetadataExtractor:
         column_names = list(df.columns)
         column_types = {col: str(df[col].dtype) for col in df.columns}
         
-        # Categorize columns by type - simple dtype checks
-        numeric_columns = []
-        categorical_columns = []
-        datetime_columns = []
-        
-        for col in df.columns:
-            dtype_str = str(df[col].dtype)
-            if df[col].dtype.kind in 'biufc':  # bool, int, uint, float, complex
-                numeric_columns.append(col)
-            elif df[col].dtype.kind in 'M':  # datetime
-                datetime_columns.append(col)
-            else:  # object, string, etc.
-                categorical_columns.append(col)
-        
         # Basic data quality - just null counts
         total_null_count = int(df.isnull().sum().sum())
         
@@ -98,9 +79,6 @@ class MetadataExtractor:
             creation_time=creation_time,
             column_names=column_names,
             column_types=column_types,
-            numeric_columns=numeric_columns,
-            categorical_columns=categorical_columns,
-            datetime_columns=datetime_columns,
             total_null_count=total_null_count,
             columns=columns_metadata,
             source_metadata=source_metadata or {}
@@ -249,98 +227,3 @@ class MetadataExtractor:
             data['columns'] = columns
         
         return DatasetMetadata(**data)
-
-
-# Convenience functions to maintain compatibility
-def extract_dataset_metadata(df: pd.DataFrame, name: str, source_type: str, 
-                           source_metadata: Optional[Dict[str, Any]] = None) -> DatasetMetadata:
-    """Convenience function to extract metadata from a DataFrame"""
-    extractor = MetadataExtractor()
-    return extractor.extract_metadata(df, name, source_type, source_metadata)
-
-
-def compare_dataset_metadata(metadata1: DatasetMetadata, metadata2: DatasetMetadata) -> Dict[str, Any]:
-    """Simple comparison of two dataset metadata objects"""
-    
-    changes = []
-    
-    # Check schema changes
-    schema_changed = False
-    if set(metadata1.column_names) != set(metadata2.column_names):
-        schema_changed = True
-        added_cols = set(metadata2.column_names) - set(metadata1.column_names)
-        removed_cols = set(metadata1.column_names) - set(metadata2.column_names)
-        
-        if added_cols:
-            changes.append({
-                "type": "schema",
-                "severity": "high",
-                "description": f"Added columns: {list(added_cols)}"
-            })
-        if removed_cols:
-            changes.append({
-                "type": "schema", 
-                "severity": "high",
-                "description": f"Removed columns: {list(removed_cols)}"
-            })
-    
-    # Check data type changes
-    for col in set(metadata1.column_names) & set(metadata2.column_names):
-        if metadata1.column_types.get(col) != metadata2.column_types.get(col):
-            schema_changed = True
-            changes.append({
-                "type": "schema",
-                "severity": "medium", 
-                "description": f"Column '{col}' type changed: {metadata1.column_types.get(col)} → {metadata2.column_types.get(col)}"
-            })
-    
-    # Check basic data changes
-    data_changed = False
-    if metadata1.row_count != metadata2.row_count:
-        data_changed = True
-        row_change = metadata2.row_count - metadata1.row_count
-        severity = "high" if abs(row_change) > metadata1.row_count * 0.1 else "medium"
-        changes.append({
-            "type": "data",
-            "severity": severity,
-            "description": f"Row count changed: {metadata1.row_count:,} → {metadata2.row_count:,} ({row_change:+,})"
-        })
-    
-    if metadata1.total_null_count != metadata2.total_null_count:
-        data_changed = True
-        null_change = metadata2.total_null_count - metadata1.total_null_count
-        severity = "high" if abs(null_change) > 100 else "medium"
-        changes.append({
-            "type": "data",
-            "severity": severity,
-            "description": f"Total null count changed: {metadata1.total_null_count:,} → {metadata2.total_null_count:,} ({null_change:+,})"
-        })
-    
-    # Calculate simple change score
-    change_score = 0
-    if schema_changed:
-        change_score += 50
-    if data_changed:
-        change_score += 30
-    
-    # Simple recommendations
-    recommendations = []
-    if schema_changed:
-        recommendations.append("Review schema changes to ensure compatibility")
-    if data_changed:
-        recommendations.append("Validate data changes and update downstream processes")
-    if not changes:
-        recommendations.append("No significant changes detected")
-    
-    return {
-        "schema_changed": schema_changed,
-        "data_changed": data_changed,
-        "changes": changes,
-        "change_score": min(change_score, 100),
-        "recommendations": recommendations,
-        "summary": {
-            "total_changes": len(changes),
-            "row_count_change": metadata2.row_count - metadata1.row_count,
-            "column_count_change": metadata2.column_count - metadata1.column_count
-        }
-    }
