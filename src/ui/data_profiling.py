@@ -1478,27 +1478,81 @@ def build_lineage_prompt() -> str:
     if lineage_data is None or lineage_data.empty:
         return "No lineage data available."
     
-    # Extract key information
+    # Extract comprehensive lineage information
     query_types = lineage_data.get('QUERY_TYPE', pd.Series()).value_counts().to_dict() if 'QUERY_TYPE' in lineage_data.columns else {}
     unique_users = lineage_data.get('USER_NAME', pd.Series()).nunique() if 'USER_NAME' in lineage_data.columns else 0
     total_queries = len(lineage_data)
     
-    prompt = f"""
-    Analyze this data lineage information and provide governance insights:
+    # Get detailed column information
+    columns_info = []
+    for col in lineage_data.columns:
+        if col in ['QUERY_TYPE', 'USER_NAME', 'OBJECT_NAME', 'OBJECT_DOMAIN', 'REFERENCED_OBJECT_NAME', 'REFERENCED_OBJECT_DOMAIN']:
+            unique_values = lineage_data[col].value_counts().head(10).to_dict()
+            columns_info.append(f"{col}: {unique_values}")
     
-    Lineage Summary:
+    # Extract sample queries or transformations if available
+    sample_data = []
+    if 'QUERY_TEXT' in lineage_data.columns:
+        sample_queries = lineage_data['QUERY_TEXT'].dropna().head(3).tolist()
+        sample_data.append(f"Sample SQL Queries: {sample_queries}")
+    
+    # Get object relationships
+    object_relationships = []
+    if 'OBJECT_NAME' in lineage_data.columns and 'REFERENCED_OBJECT_NAME' in lineage_data.columns:
+        relationships = lineage_data.groupby(['OBJECT_NAME', 'REFERENCED_OBJECT_NAME']).size().head(10)
+        for (obj, ref_obj), count in relationships.items():
+            object_relationships.append(f"{ref_obj} -> {obj} (used {count} times)")
+    
+    # Get time patterns if available
+    time_patterns = []
+    if 'START_TIME' in lineage_data.columns:
+        try:
+            lineage_data['START_TIME'] = pd.to_datetime(lineage_data['START_TIME'])
+            time_patterns.append(f"Query frequency by hour: {lineage_data['START_TIME'].dt.hour.value_counts().head(5).to_dict()}")
+            time_patterns.append(f"Date range: {lineage_data['START_TIME'].min()} to {lineage_data['START_TIME'].max()}")
+        except:
+            pass
+    
+    # Build comprehensive context
+    detailed_context = f"""
+    DETAILED LINEAGE ANALYSIS:
+    
+    Basic Statistics:
     - Total queries analyzed: {total_queries}
-    - Query types: {query_types}
+    - Query types distribution: {query_types}
     - Unique users: {unique_users}
     
-    Please provide:
-    1. Assessment of data transformation patterns
-    2. Data governance considerations
-    3. Risk assessment for data quality
-    4. Recommendations for monitoring and controls
-    5. Best practices for this data pipeline
+    Column Details:
+    {chr(10).join(columns_info) if columns_info else "No detailed column information available"}
     
-    Focus on actionable data governance recommendations.
+    Object Relationships:
+    {chr(10).join(object_relationships) if object_relationships else "No object relationships found"}
+    
+    Sample Data/Queries:
+    {chr(10).join(sample_data) if sample_data else "No sample queries available"}
+    
+    Time Patterns:
+    {chr(10).join(time_patterns) if time_patterns else "No time pattern information available"}
+    
+    Raw Data Sample (first 5 rows):
+    {lineage_data.head().to_string() if len(lineage_data) > 0 else "No data available"}
+    """
+    
+    prompt = f"""
+    Analyze this comprehensive data lineage information and provide governance insights:
+    
+    {detailed_context}
+    
+    Based on this detailed lineage information, please provide:
+    1. Assessment of data transformation patterns and complexity
+    2. Data governance considerations and potential gaps
+    3. Risk assessment for data quality and pipeline reliability
+    4. Recommendations for monitoring and controls
+    5. Best practices for this data pipeline architecture
+    6. Identification of potential single points of failure
+    7. Recommendations for improving data documentation and traceability
+    
+    Focus on actionable data governance recommendations based on the actual lineage patterns you observe.
     """
     
     prompt += """
@@ -1506,15 +1560,14 @@ def build_lineage_prompt() -> str:
     Return your response as a valid JSON object with the following structure:
     {
         "data_quality_assessment": {
-            "overall_assessment": "A brief summary of data quality",
-            "key_concerns_and_risks": ["List of key concerns", "List of risks"]
+            "overall_assessment": "A comprehensive summary of the data lineage quality and governance maturity",
+            "key_concerns_and_risks": ["List of specific concerns based on the lineage patterns", "List of risks identified from the data"]
         },
-        "data_cleaning_recommendations": ["Recommendation 1", "Recommendation 2"],
-        "prioritized_action_items": ["High priority item 1", "Medium priority item 2"]
+        "data_cleaning_recommendations": ["Specific recommendation based on lineage analysis", "Another recommendation based on observed patterns"],
+        "prioritized_action_items": ["High priority item based on actual lineage issues", "Medium priority governance improvement"]
     }
     Do not include any text outside the JSON object.
     """
-
 
     return prompt
 
