@@ -42,7 +42,7 @@ DataMend is designed to help organizations ensure data quality across their enti
 
 1. **Clone the Repository**:
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/Mesbahul-Islam/datamend.git
    cd datamend
    ```
 
