@@ -25,7 +25,6 @@ class QualityIssue:
 
 def data_profiling_tab(anomaly_threshold: float):
     """Data profiling tab"""
-    st.header("Data Profiling")
     
     if st.session_state.data is None:
         st.warning("Please load data first using the sidebar")
@@ -416,7 +415,7 @@ def display_export_options(profile):
             file_size_mb = len(html_report.encode('utf-8')) / (1024 * 1024)
             st.metric("Report Size", f"{file_size_mb:.1f} MB")
         
-        st.success("Report ready for download! The HTML file contains:")
+        st.success("Report ready for download!")
         
         st.info("**Tip**: Open the downloaded HTML file in your browser for the best viewing experience with full interactivity.")
         

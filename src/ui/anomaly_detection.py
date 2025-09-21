@@ -13,7 +13,7 @@ from src.ui.data_profiling import display_ai_recommendations_section
 
 def anomaly_detection_tab(anomaly_threshold: float):
     """Statistical anomaly analysis results - powered by ydata-profiling"""
-    st.subheader("📊 Statistical Anomaly Analysis")
+    st.subheader(" Statistical Anomaly Analysis")
     
     # Clear explanation of what this tab does
     st.info("🎯 **Purpose:** View and analyze statistical anomalies detected in your data using ydata-profiling's IQR method. "
@@ -37,7 +37,7 @@ def anomaly_detection_tab(anomaly_threshold: float):
         
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("📊 View Anomaly Results", type="primary", width='stretch'):
+            if st.button(" View Anomaly Results", type="primary", width='stretch'):
                 if st.session_state.get('ydata_anomaly_results'):
                     display_ydata_anomaly_results(st.session_state.ydata_anomaly_results, st.session_state.data)
                 else:
@@ -78,20 +78,15 @@ def display_ydata_anomaly_results(anomalies_info, df: pd.DataFrame):
     total_anomalies = sum(info['count'] for info in anomalies_info.values())
     anomaly_rate = (total_anomalies / len(df)) * 100
     
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2 = st.columns(2)
     with col1:
-        st.write("Total Anomalies", f"{total_anomalies:,}")
+        st.metric("Affected Columns", len(anomalies_info))
     with col2:
-        st.write("Affected Columns", len(anomalies_info))
-    with col3:
-        st.write("Anomaly Rate", f"{anomaly_rate:.2f}%")
-    with col4:
-        severity = "🔴 High" if anomaly_rate > 10 else "🟡 Medium" if anomaly_rate > 1 else "🟢 Low"
-        st.write("Severity Level", severity)
+        st.metric("Anomaly Rate", f"{anomaly_rate:.2f}%")
     
     # Create visualizations for each column with anomalies
     for column, info in anomalies_info.items():
-        st.subheader(f"📈 Anomaly Visualization: {column}")
+        st.write(f"📊Anomaly Visualization: {column}")
         
         try:
             fig = create_ydata_anomaly_visualization(df, column, info)
@@ -102,7 +97,7 @@ def display_ydata_anomaly_results(anomalies_info, df: pd.DataFrame):
             st.warning(f"Could not create visualization for {column}: {str(e)}")
         
         # Show detailed stats
-        with st.expander(f"📊 Detailed Statistics for {column}"):
+        with st.expander(f" Detailed Statistics for {column}"):
             detail_col1, detail_col2 = st.columns(2)
             
             with detail_col1:

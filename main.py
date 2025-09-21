@@ -38,6 +38,25 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+st.markdown("""
+<style>
+    .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
+        font-size: 18px !important;
+        font-weight: 600 !important;
+    }
+    
+    /* Alternative selector in case the above doesn't work */
+    .stTabs [data-baseweb="tab-list"] {
+        font-size: 18px !important;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        font-size: 18px !important;
+        font-weight: 600 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 def main():
     """Main application function"""
     st.title("DataMend - Data Quality Management")
@@ -221,7 +240,6 @@ def main():
 
     # User guidance section
     if st.session_state.data is not None:
-        st.success(f"Dataset loaded: {st.session_state.current_dataset}")
         lineage_text = "\n4. **Data Lineage** - Visualize Snowflake data dependencies with AI insights" if st.session_state.get('data_source') == 'snowflake' else ""
         
         st.info("**Quick Start Guide:**\n"
@@ -229,8 +247,8 @@ def main():
                 "2. **Data Profiling** - Comprehensive analysis with AI insights\n"
                 "   • Quick Summary | Detailed Report | Statistical Outliers | Analytics Quality\n"
                 "   • Get AI-powered recommendations after profiling\n"
-                "3. **Statistical Outliers** - View outlier results with AI explanations" + lineage_text + "\n\n"
-                "💡 **AI Recommendations** are now integrated into each analysis stage!")
+                "3. **Statistical Outliers** - View outlier results with AI explanations" + lineage_text + "\n\n")
+        st.success(f"Last dataset loaded: {st.session_state.current_dataset}")
     else:
         st.warning("Please load a dataset using the sidebar to get started.")
 
@@ -238,7 +256,7 @@ def main():
     tab_names = [
         "Data Overview", 
         "Data Profiling", 
-        "Statistical Outliers"
+        "Anomaly Detection"
     ]
     
     # Add Data Lineage tab if data source is Snowflake

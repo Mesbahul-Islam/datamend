@@ -40,8 +40,6 @@ def data_overview_tab():
         st.info("No data loaded. Please load data from the Data Sources tab first.")
         return
     
-    st.header("Data Overview")
-    
     # Show summary of all loaded datasets
     st.subheader("Loaded Datasets Summary")
     
