@@ -169,7 +169,7 @@ HDFS_TIMEOUT=30
 
 ### Project Structure
 ```
-hackathon_2/
+datamend/
 ├── main.py                           # Main application entry point
 ├── requirements.txt                  # Python dependencies
 ├── .env                             # Environment configuration
