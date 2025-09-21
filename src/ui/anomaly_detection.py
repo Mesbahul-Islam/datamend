@@ -112,10 +112,7 @@ def display_ydata_anomaly_results(anomalies_info, df: pd.DataFrame):
                 st.write(f"• Mean: {stats['mean']:.3f}")
                 st.write(f"• Std Dev: {stats['std']:.3f}")
                 st.write(f"• IQR: {stats['IQR']:.3f}")
-    
-    # AI Recommendations section after anomaly analysis
-    st.markdown("---")
-    display_ai_recommendations_section("outliers")
+
 
 
 def create_ydata_anomaly_visualization(df: pd.DataFrame, column: str, anomaly_info: dict):

@@ -240,17 +240,16 @@ def main():
 
     # User guidance section
     if st.session_state.data is not None:
-        lineage_text = "\n4. **Data Lineage** - Visualize Snowflake data dependencies with AI insights" if st.session_state.get('data_source') == 'snowflake' else ""
         
         st.info("**Quick Start Guide:**\n"
-                "1. **Data Overview** - Basic dataset information\n"
-                "2. **Data Profiling** - Comprehensive analysis with AI insights\n"
-                "   • Quick Summary | Detailed Report | Statistical Outliers | Analytics Quality\n"
-                "   • Get AI-powered recommendations after profiling\n"
-                "3. **Statistical Outliers** - View outlier results with AI explanations" + lineage_text)
-        
-        # Add the small text separately
-        st.markdown("<small style='color: #6c757d;'>😉 Make sure to clear AI assessment after use (just because)</small>", unsafe_allow_html=True)
+        "1. **Data Overview** - Basic dataset information\n"
+        "2. **Data Profiling** - Comprehensive analysis with AI insights\n"
+        "   • Quick Summary | Detailed Report | Statistical Outliers | Analytics Quality\n"
+        "   • Get AI-powered recommendations after profiling\n"
+        "3. **Statistical Outliers** - View outlier results with AI explanations"
+        "\n4. **Data Lineage** - Visualize Snowflake data dependencies with AI insights (only if you're connected to Snowflake)")
+
+        st.info("Make sure to clear AI assessment after use (just because)", icon="😉")
     else:
         st.warning("Please load a dataset using the sidebar to get started.")
 
