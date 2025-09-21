@@ -247,8 +247,10 @@ def main():
                 "2. **Data Profiling** - Comprehensive analysis with AI insights\n"
                 "   • Quick Summary | Detailed Report | Statistical Outliers | Analytics Quality\n"
                 "   • Get AI-powered recommendations after profiling\n"
-                "3. **Statistical Outliers** - View outlier results with AI explanations" + lineage_text + "\n\n")
-        st.success(f"Last dataset loaded: {st.session_state.current_dataset}")
+                "3. **Statistical Outliers** - View outlier results with AI explanations" + lineage_text)
+        
+        # Add the small text separately
+        st.markdown("<small style='color: #6c757d;'>😉 Make sure to clear AI assessment after use (just because)</small>", unsafe_allow_html=True)
     else:
         st.warning("Please load a dataset using the sidebar to get started.")
 
@@ -256,7 +258,7 @@ def main():
     tab_names = [
         "Data Overview", 
         "Data Profiling", 
-        "Anomaly Detection"
+        "Anomaly Detection Results Overview"
     ]
     
     # Add Data Lineage tab if data source is Snowflake

@@ -13,6 +13,10 @@ from src.ui.data_profiling import display_ai_recommendations_section
 
 def anomaly_detection_tab(anomaly_threshold: float):
     """Statistical anomaly analysis results - powered by ydata-profiling"""
+
+    if st.session_state.current_dataset:
+        st.info(f"Analyzing Dataset: {st.session_state.current_dataset}")
+
     st.subheader(" Statistical Anomaly Analysis")
     
     # Clear explanation of what this tab does
@@ -26,10 +30,6 @@ def anomaly_detection_tab(anomaly_threshold: float):
     if st.session_state.data is None:
         st.warning("Please load data first using the sidebar")
         return
-    
-    # Show current dataset info
-    if st.session_state.current_dataset:
-        st.info(f"Analyzing Dataset: {st.session_state.current_dataset}")
     
     # Check if ydata-profiling anomaly detection was run
     if st.session_state.get('ydata_anomaly_detection', False):

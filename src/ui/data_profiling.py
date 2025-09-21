@@ -36,29 +36,7 @@ def data_profiling_tab(anomaly_threshold: float):
     
     df = st.session_state.data
     
-    # Profiling controls
-    col1, col2 = st.columns([3, 1])
-    
-    with col1:
-        # Cache expensive dataset size calculation
-        @st.cache_data
-        def get_dataset_info(dataset_hash):
-            """Get dataset size information with caching"""
-            dataset_size_mb = df.memory_usage(deep=True).sum() / 1024 / 1024
-            return dataset_size_mb
-        
-        # Create a simple hash for the current dataset
-        dataset_hash = f"{len(df)}_{len(df.columns)}_{id(df)}"
-        dataset_size_mb = get_dataset_info(dataset_hash)
-
-        # Determine processing strategy message
-        if len(df) > 100000:
-            processing_strategy = "Large dataset - using parallel processing"
-        else:
-            processing_strategy = "Standard dataset - using optimized sequential processing"
-        
-        st.write(f"**Dataset:** {len(df):,} rows × {len(df.columns)} columns ({dataset_size_mb:.1f} MB)")
-    
+    col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
         if st.button("Run Profiling", type="primary", key="run_profiling_button"):
             run_data_profiling(df, anomaly_threshold)
@@ -104,7 +82,7 @@ def display_ydata_profiling_results(profile, anomaly_threshold: float):
 
     
     # Create tabs for different views
-    tab1, tab2, tab3, tab4 = st.tabs(["Quick Summary", "Detailed Report", "Anomaly Detection", "Analytics Quality"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Quick Summary", "Detailed Report", "Anomaly Detection", "Uncertainty Analysis for Downstream Analytics"])
     
     with tab1:
         display_ydata_summary(profile)
@@ -251,27 +229,6 @@ def display_enhanced_report(profile):
         table_stats = description.table
         variables = description.variables
         
-        # Dataset Overview Section
-        st.markdown("### Dataset Overview")
-        
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.metric("Total Variables", table_stats.get('n_var', 0))
-        with col2:
-            st.metric("Total Observations", f"{table_stats.get('n', 0):,}")
-        with col3:
-            missing_cells = table_stats.get('n_cells_missing', 0)
-            # Calculate total cells properly: rows * columns
-            n_obs = table_stats.get('n', 0)
-            n_vars = table_stats.get('n_var', 0)
-            total_cells = n_obs * n_vars if n_obs > 0 and n_vars > 0 else 1
-            missing_pct = (missing_cells / total_cells) * 100 if total_cells > 0 else 0
-            st.metric("Missing Data", f"{missing_pct:.1f}%")
-        with col4:
-            duplicates = table_stats.get('n_duplicates', 0)
-            duplicate_pct = (duplicates / table_stats.get('n', 1)) * 100 if table_stats.get('n', 0) > 0 else 0
-            st.metric("Duplicate Rows", f"{duplicate_pct:.1f}%")
-        
         # Variable Types Analysis
         st.markdown("### Variable Types Distribution")
         types_summary = table_stats.get('types', {})
@@ -282,11 +239,11 @@ def display_enhanced_report(profile):
             ])
             st.dataframe(types_df, width='stretch', hide_index=True)
         
-        # Variable Details Analysis
+        # Variable Details Analysis - SIMPLIFIED
         st.markdown("### Variable Analysis")
         
         if variables:
-            # Create detailed variable analysis
+            # Create simplified variable analysis with only essential columns
             variable_details = []
             
             for var_name, var_info in variables.items():
@@ -306,34 +263,36 @@ def display_enhanced_report(profile):
                 else:
                     status = "Good"
                 
-                # Get key statistics based on type
-                key_stats = ""
+                # Get only key statistics based on type
+                key_stat = None
+                
                 if var_type == "Numeric":
-                    mean_val = var_info.get('mean', 0)
-                    std_val = var_info.get('std', 0)
-                    key_stats = f"Mean: {mean_val:.2f}, Std: {std_val:.2f}" if mean_val and std_val else "Basic stats available"
+                    mean_val = var_info.get('mean', None)
+                    key_stat = f"Mean: {mean_val:.2f}" if mean_val is not None else "-"
                 elif var_type == "Categorical":
-                    n_categories = var_info.get('n_distinct', 0)
-                    key_stats = f"{n_categories} categories"
+                    categories = var_info.get('n_distinct', 0)
+                    key_stat = f"Categories: {categories}"
                 elif var_type == "Text":
-                    max_length = var_info.get('max_length', 0)
-                    key_stats = f"Max length: {max_length}" if max_length else "Text analysis available"
+                    max_length = var_info.get('max_length', None)
+                    key_stat = f"Max Length: {max_length}" if max_length is not None else "-"
+                else:
+                    key_stat = "-"
                 
                 variable_details.append({
                     "Variable": var_name,
                     "Type": var_type,
-                    "Status": status,
-                    "Missing %": f"{missing_pct:.1f}%",
-                    "Unique Values": f"{n_unique:,}",
-                    "Key Statistics": key_stats
+                    "Key Statistic": key_stat,
+                    "Status": status
                 })
             
-            # Display variable details table
+            # Display simplified variable details table
             variables_df = pd.DataFrame(variable_details)
             st.dataframe(variables_df, width='stretch', hide_index=True)
         
         # Data Quality Issues
         st.markdown("### Data Quality Assessment")
+        
+        duplicate_pct = (table_stats.get('n_duplicates', 0) / table_stats.get('n', 1)) * 100
         
         quality_issues = []
         
@@ -345,19 +304,19 @@ def display_enhanced_report(profile):
         
         # Check for duplicate rows
         if duplicate_pct > 5:
-            quality_issues.append(f" Duplicate rows detected: {duplicate_pct:.1f}% of the dataset")
+            quality_issues.append(f"Duplicate rows detected: {duplicate_pct:.1f}% of the dataset")
         
         # Check for constant variables
         constant_vars = [name for name, info in variables.items() 
                         if info.get('n_distinct', 0) <= 1]
         if constant_vars:
-            quality_issues.append(f" Constant variables found: {', '.join(constant_vars)}")
+            quality_issues.append(f"Constant variables found: {', '.join(constant_vars)}")
         
         if quality_issues:
             for issue in quality_issues:
                 st.warning(issue)
         else:
-            st.success(" No major data quality issues detected!")
+            st.success("No major data quality issues detected!")
         
     except Exception as e:
         st.error(f"Error displaying enhanced report: {str(e)}")
@@ -403,7 +362,7 @@ def display_export_options(profile):
         
         with col1:
             st.download_button(
-                label="Download Complete HTML Report",
+                label="Download Complete Data Profile HTML Report",
                 data=html_report,
                 file_name=filename,
                 mime="text/html",
@@ -1236,7 +1195,7 @@ def display_quality_analysis_results(results: Dict[str, Any]):
         if critical_issues:
             st.markdown("**Critical Issues (Must Fix)**")
             for issue in critical_issues:
-                with st.expander(f"{issue.title}"):
+                with st.expander(f"{issue.title}", expanded=False):
                     st.write(f"**Impact:** {issue.description}")
                     st.write(f"**Affected Columns:** `{', '.join(issue.affected_columns)}`")
                     st.write(f"**Recommendation:** {issue.recommendation}")
@@ -1244,7 +1203,7 @@ def display_quality_analysis_results(results: Dict[str, Any]):
         if high_issues:
             st.markdown("**High Priority Issues**")
             for issue in high_issues:
-                with st.expander(f"{issue.title}"):
+                with st.expander(f"{issue.title}",expanded=False):
                     st.write(f"**Impact:** {issue.description}")
                     st.write(f"**Affected Columns:** `{', '.join(issue.affected_columns)}`")
                     st.write(f"**Recommendation:** {issue.recommendation}")
@@ -1252,7 +1211,7 @@ def display_quality_analysis_results(results: Dict[str, Any]):
         if medium_issues:
             st.markdown("**Medium Priority Issues**")
             for issue in medium_issues:
-                with st.expander(f"{issue.title}"):
+                with st.expander(f"{issue.title}",expanded=False):
                     st.write(f"**Impact:** {issue.description}")
                     st.write(f"**Affected Columns:** `{', '.join(issue.affected_columns)}`")
                     st.write(f"**Recommendation:** {issue.recommendation}")
@@ -1718,8 +1677,7 @@ def display_structured_assessment(assessment: dict):
                             'Low': '🟢'
                         }.get(priority, '🟡')
                         
-                        with st.expander(f"{priority_color} {action} - {priority} Priority"):
-                            st.write(f"**Recommendation:** {action}")
+                        st.write(f"{priority_color} **{action}**")
                     except ValueError:
                         # Fallback if parsing fails
                         st.write(f"• {rec}")
@@ -1731,10 +1689,11 @@ def display_structured_assessment(assessment: dict):
                         'Medium': '🟡', 
                         'Low': '🟢'
                     }.get(priority, '🟡')
-                    with st.expander(f"{priority_color} {action} - {priority} Priority"):
-                        st.write(f"**Recommendation:** {action}")
+                    st.write(f"{priority_color} **{action}**")
                 else:
                     st.write(f"• {rec}")
+
+                st.write("---")
             elif isinstance(rec, dict):
                 priority = rec.get('priority', 'Medium')
                 priority_color = {
@@ -1746,11 +1705,11 @@ def display_structured_assessment(assessment: dict):
                 variable = rec.get('variable', 'Not specified')
                 issue = rec.get('issue', rec.get('action', 'Action'))
                 
-                with st.expander(f"{priority_color} {variable}: {issue} - {priority} Priority"):
-                    if 'recommendation' in rec:
-                        st.write(f"**Recommendation:** {rec['recommendation']}")
-                    elif 'details' in rec:
-                        st.write(f"**Details:** {rec['details']}")
+                st.write(f"{priority_color} **{issue}** (Variable: `{variable}`)")
+                if 'recommendation' in rec:
+                    st.write(f"**Recommendation:** {rec['recommendation']}")
+                elif 'details' in rec:
+                    st.write(f"**Details:** {rec['details']}")
     
     # Prioritized Action Items
     if action_items:

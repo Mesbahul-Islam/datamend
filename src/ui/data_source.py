@@ -34,6 +34,26 @@ def data_source_tab():
 def data_overview_tab():
     """Data overview tab - shows all loaded datasets and allows selection"""
     import pandas as pd
+
+    st.markdown("""
+    <style>
+    div[data-testid="stSelectbox"] > div > div > div {
+        font-size: 18px !important;
+        font-weight: 600 !important;
+    }
+    
+    /* Style the selectbox label */
+    div[data-testid="stSelectbox"] label {
+        font-size: 16px !important;
+        font-weight: 600 !important;
+    }
+    
+    /* Style the selected value in the selectbox */
+    div[data-testid="stSelectbox"] > div > div {
+        font-size: 18px !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
     
     # Check if any datasets are loaded
     if 'datasets' not in st.session_state or not st.session_state.datasets:
@@ -65,9 +85,56 @@ def data_overview_tab():
                 df = dataset_info
                 source_type = 'file'
             
-            # Expensive calculations
+            # Basic metrics
             memory_usage = df.memory_usage(deep=True).sum() / 1024**2
+            
+            # Data Quality Metrics
+            total_cells = len(df) * len(df.columns)
             missing_count = df.isnull().sum().sum()
+            
+            # Completeness Score (0-100)
+            completeness_score = ((total_cells - missing_count) / total_cells * 100) if total_cells > 0 else 0
+            
+            # Consistency Score - check for duplicate rows
+            duplicate_rows = df.duplicated().sum()
+            consistency_score = ((len(df) - duplicate_rows) / len(df) * 100) if len(df) > 0 else 100
+            
+            # Validity Score - check for mixed data types in object columns
+            validity_issues = 0
+            for col in df.select_dtypes(include=['object']).columns:
+                try:
+                    # Try converting to numeric to detect mixed types
+                    pd.to_numeric(df[col], errors='raise')
+                except (ValueError, TypeError):
+                    # Check if column has mixed numeric/text values
+                    sample_values = df[col].dropna().head(100)
+                    numeric_count = 0
+                    for val in sample_values:
+                        try:
+                            float(val)
+                            numeric_count += 1
+                        except (ValueError, TypeError):
+                            pass
+                    # If 10-90% are numeric, it's likely mixed types
+                    if 0.1 < numeric_count / len(sample_values) < 0.9 and len(sample_values) > 10:
+                        validity_issues += 1
+            
+            validity_score = max(0, 100 - (validity_issues / len(df.columns) * 100)) if len(df.columns) > 0 else 100
+            
+            # Overall Quality Score (weighted average)
+            quality_score = (completeness_score * 0.4 + consistency_score * 0.3 + validity_score * 0.3)
+            
+            # Quality grade
+            if quality_score >= 90:
+                quality_grade = "A"
+            elif quality_score >= 80:
+                quality_grade = "B"
+            elif quality_score >= 70:
+                quality_grade = "C"
+            elif quality_score >= 60:
+                quality_grade = "D"
+            else:
+                quality_grade = "F"
             
             summary_data.append({
                 'Dataset Name': dataset_name,
@@ -75,8 +142,11 @@ def data_overview_tab():
                 'Rows': f"{len(df):,}",
                 'Columns': len(df.columns),
                 'Memory (MB)': f"{memory_usage:.1f}",
-                'Missing Values': f"{missing_count:,}",
-                'Missing %': f"{(missing_count / (len(df) * len(df.columns)) * 100):.1f}%"
+                'Completeness': f"{completeness_score:.1f}%",
+                'Consistency': f"{consistency_score:.1f}%",
+                'Validity': f"{validity_score:.1f}%",
+                'Quality Score': f"{quality_score:.1f}",
+                'Grade': quality_grade
             })
         
         return summary_data
@@ -112,13 +182,8 @@ def data_overview_tab():
         
         total_datasets, total_rows, total_memory = calculate_total_stats(datasets_hash)
         
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Total Datasets", total_datasets)
-        with col2:
-            st.metric("Total Rows", f"{total_rows:,}")
-        with col3:
-            st.metric("Total Memory", f"{total_memory:.1f} MB")
+    st.metric("Total Datasets loaded", total_datasets)
+        
     
     # Dataset selection and detailed view
     st.markdown("---")
@@ -179,19 +244,123 @@ def data_overview_tab():
             memory_usage = df.memory_usage(deep=True).sum() / 1024**2
             st.metric("Memory Usage", f"{memory_usage:.1f} MB")
         with col4:
+            # Calculate overall data quality score
+            total_cells = len(df) * len(df.columns)
             missing_count = df.isnull().sum().sum()
-            st.metric("Missing Values", f"{missing_count:,}")
+            completeness = ((total_cells - missing_count) / total_cells * 100) if total_cells > 0 else 0
+            
+            duplicate_rows = df.duplicated().sum()
+            consistency = ((len(df) - duplicate_rows) / len(df) * 100) if len(df) > 0 else 100
+            
+            quality_score = (completeness * 0.6 + consistency * 0.4)
+            st.metric("Data Quality", f"{quality_score:.1f}%")
         
-        # Column information
-        st.subheader("Column Information")
-        col_info = pd.DataFrame({
-            'Column': df.columns,
-            'Type': df.dtypes.astype(str),
-            'Non-Null Count': df.count(),
-            'Null Count': df.isnull().sum(),
-            'Null %': (df.isnull().sum() / len(df) * 100).round(2)
-        })
-        st.dataframe(col_info, width='stretch')
+        # Data Quality Breakdown
+        st.subheader("Data Quality Metrics")
+        
+        # Calculate detailed quality metrics
+        total_cells = len(df) * len(df.columns)
+        missing_count = df.isnull().sum().sum()
+        completeness_score = ((total_cells - missing_count) / total_cells * 100) if total_cells > 0 else 0
+        
+        duplicate_count = df.duplicated().sum()
+        consistency_score = ((len(df) - duplicate_count) / len(df) * 100) if len(df) > 0 else 100
+        
+        # Check for empty columns
+        empty_columns = df.columns[df.isnull().all()].tolist()
+        
+        # Check for constant columns
+        constant_columns = []
+        for col in df.columns:
+            if df[col].nunique() <= 1:
+                constant_columns.append(col)
+        
+        # Data quality metrics display
+        quality_col1, quality_col2, quality_col3, quality_col4 = st.columns(4)
+        
+        with quality_col1:
+            st.metric(
+                "Completeness", 
+                f"{completeness_score:.1f}%",
+                help="Percentage of non-missing values across all cells"
+            )
+        
+        with quality_col2:
+            st.metric(
+                "Consistency", 
+                f"{consistency_score:.1f}%",
+                help="Percentage of unique rows (no duplicates)"
+            )
+        
+        with quality_col3:
+            validity_issues = len(empty_columns) + len(constant_columns)
+            validity_score = max(0, 100 - (validity_issues / len(df.columns) * 100)) if len(df.columns) > 0 else 100
+            st.metric(
+                "Validity", 
+                f"{validity_score:.1f}%",
+                help="Percentage of columns without structural issues"
+            )
+        
+        with quality_col4:
+            overall_quality = (completeness_score * 0.4 + consistency_score * 0.3 + validity_score * 0.3)
+            st.metric(
+                "Overall Quality", 
+                f"{overall_quality:.1f}%",
+                help="Weighted average of all quality metrics"
+            )
+        
+        # Quality Issues Alert
+        issues = []
+        if completeness_score < 90:
+            issues.append(f"Low completeness: {missing_count:,} missing values")
+        if duplicate_count > 0:
+            issues.append(f"Data duplicates: {duplicate_count:,} duplicate rows")
+        if empty_columns:
+            issues.append(f"Empty columns: {len(empty_columns)} columns with no data")
+        if constant_columns:
+            issues.append(f"Constant columns: {len(constant_columns)} columns with only one value")
+        
+        if issues:
+            st.warning("Data Quality Issues Detected:", width=500)
+            for issue in issues:
+                st.write(f"• {issue}")
+        else:
+            st.success("No major data quality issues detected!")
+        
+        # Column information with quality indicators
+        st.subheader("Column Quality Analysis")
+        col_quality_data = []
+        for col in df.columns:
+            null_count = df[col].isnull().sum()
+            null_pct = (null_count / len(df) * 100) if len(df) > 0 else 0
+            unique_count = df[col].nunique()
+            
+            # Determine quality status
+            if null_pct == 100:
+                quality_status = "Empty"
+            elif unique_count <= 1:
+                quality_status = "Constant"
+            elif null_pct > 50:
+                quality_status = "Poor"
+            elif null_pct > 20:
+                quality_status = "Fair"
+            elif null_pct > 5:
+                quality_status = "Good"
+            else:
+                quality_status = "Excellent"
+            
+            col_quality_data.append({
+                'Column': col,
+                'Type': str(df[col].dtype),
+                'Non-Null': f"{len(df) - null_count:,}",
+                'Missing': f"{null_count:,}",
+                'Missing %': f"{null_pct:.1f}%",
+                'Unique Values': f"{unique_count:,}",
+                'Quality': quality_status
+            })
+        
+        col_quality_df = pd.DataFrame(col_quality_data)
+        st.dataframe(col_quality_df, width='stretch')
         
 
 
