@@ -412,7 +412,7 @@ def handle_sidebar_snowflake_connection():
         handle_snowflake_connection()
     else:
         # If connected, show data loading interface
-        st.success("✅ Connected to Snowflake")
+        st.success("Connected to Snowflake")
         handle_snowflake_data_loading()
         
         # Add disconnect option
@@ -428,4 +428,51 @@ def handle_sidebar_snowflake_connection():
             st.rerun()
 
 
+def handle_sidebar_oracle_connection():
+    """Backwards compatibility - Oracle connection functionality for sidebar"""
+    from src.ui.data_sources import handle_oracle_connection, handle_oracle_data_loading
+    
+    # If not connected, show connection interface
+    if not st.session_state.get('oracle_connected', False):
+        handle_oracle_connection()
+    else:
+        # If connected, show data loading interface
+        st.success("Connected to Oracle Database")
+        handle_oracle_data_loading()
+        
+        # Add disconnect option
+        st.markdown("---")
+        if st.button("Disconnect from Oracle", key="sidebar_oracle_disconnect"):
+            st.session_state.oracle_connected = False
+            if 'oracle_connector' in st.session_state:
+                try:
+                    st.session_state.oracle_connector.close()
+                except:
+                    pass
+                del st.session_state.oracle_connector
+            st.rerun()
 
+
+def handle_sidebar_hdfs_connection():
+    """Backwards compatibility - HDFS connection functionality for sidebar"""
+    from src.ui.data_sources import handle_hdfs_connection, handle_hdfs_data_loading
+    
+    # If not connected, show connection interface
+    if not st.session_state.get('hdfs_connected', False):
+        handle_hdfs_connection()
+    else:
+        # If connected, show data loading interface
+        st.success("Connected to HDFS")
+        handle_hdfs_data_loading()
+        
+        # Add disconnect option
+        st.markdown("---")
+        if st.button("Disconnect from HDFS", key="sidebar_hdfs_disconnect"):
+            st.session_state.hdfs_connected = False
+            if 'hdfs_connector' in st.session_state:
+                try:
+                    st.session_state.hdfs_connector.close()
+                except:
+                    pass
+                del st.session_state.hdfs_connector
+            st.rerun()

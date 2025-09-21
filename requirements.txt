@@ -5,6 +5,8 @@ ydata-profiling==4.16.0
 plotly==6.3.0
 matplotlib>=3.6.0
 snowflake-connector-python==3.17.3
+oracledb>=2.0.0
+hdfs3>=0.3.1
 SQLAlchemy==2.0.43
 psycopg2-binary==2.9.10
 google-genai==1.38.0

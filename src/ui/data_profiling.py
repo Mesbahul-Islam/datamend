@@ -337,10 +337,10 @@ def display_anomaly_detection_section(profile, anomaly_threshold: float):
         st.write("• Lower thresholds (e.g., 1.0) detect more outliers, higher thresholds (e.g., 3.0) are more conservative")
         st.write("• Robust against various data distributions")
     
-    if st.button("Extract Anomalies", type="primary", use_container_width=True, help="Extract anomalies detected by ydata-profiling"):
+    if st.button("Extract Anomalies", type="primary", width = 200, help="Extract anomalies detected by ydata-profiling"):
         display_profiling_outliers(profile, st.session_state.data, anomaly_threshold)
     
-    if st.button("Anomaly Summary", type="secondary", use_container_width=True, help="Show comprehensive anomaly analysis from profiling"):
+    if st.button("Anomaly Summary", type="secondary", width = 200, help="Show comprehensive anomaly analysis from profiling"):
         # Clear the page and show full analysis
         st.empty()
         display_full_anomaly_analysis_page(profile, st.session_state.data, anomaly_threshold)
@@ -2218,7 +2218,6 @@ def display_anomaly_analysis_results(parsed_response: dict):
     
     # Analysis Summary Section
     if analysis_summary:
-        st.subheader(" Analysis Summary")
         
         # Statistical Significance
         if "statisticalSignificance" in analysis_summary:
