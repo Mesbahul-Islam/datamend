@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  datamend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: datamend-app
+    ports:
+      - "8501:8501"
+    environment:
+      # LLM Configuration
+      - LLM_PROVIDER=${LLM_PROVIDER:-gemini}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL=${LLM_MODEL:-gemini-2.0-flash}
+      
+      # Snowflake Configuration (optional)
+      - SNOWFLAKE_ACCOUNT=${SNOWFLAKE_ACCOUNT}
+      - SNOWFLAKE_USERNAME=${SNOWFLAKE_USERNAME}
+      - SNOWFLAKE_PASSWORD=${SNOWFLAKE_PASSWORD}
+      - SNOWFLAKE_WAREHOUSE=${SNOWFLAKE_WAREHOUSE}
+      - SNOWFLAKE_DATABASE=${SNOWFLAKE_DATABASE}
+      - SNOWFLAKE_SCHEMA=${SNOWFLAKE_SCHEMA}
+      
+      # Oracle Configuration (optional)
+      - ORACLE_CONNECTION_STRING=${ORACLE_CONNECTION_STRING}
+      - ORACLE_USERNAME=${ORACLE_USERNAME}
+      - ORACLE_PASSWORD=${ORACLE_PASSWORD}
+      - ORACLE_WALLET_LOCATION=${ORACLE_WALLET_LOCATION}
+      - ORACLE_WALLET_PASSWORD=${ORACLE_WALLET_PASSWORD}
+      
+      # HDFS Configuration (optional)
+      - HDFS_NAMENODE_URL=${HDFS_NAMENODE_URL}
+      - HDFS_USERNAME=${HDFS_USERNAME}
+      - HDFS_TIMEOUT=${HDFS_TIMEOUT}
+    volumes:
+      # Mount data directory for file uploads
+      - ./data:/app/data:ro
+      # Mount logs directory
+      - ./logs:/app/logs
+      # Mount Oracle wallet if needed
+      - ${ORACLE_WALLET_LOCATION:-/tmp}:/app/wallet:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - datamend-network
+
+# Optional: Add database services if needed for testing
+# Uncomment the services below if you want to run local databases
+
+#  postgres:
+#    image: postgres:15
+#    container_name: datamend-postgres
+#    environment:
+#      POSTGRES_DB: testdb
+#      POSTGRES_USER: testuser
+#      POSTGRES_PASSWORD: testpass
+#    ports:
+#      - "5432:5432"
+#    volumes:
+#      - postgres_data:/var/lib/postgresql/data
+#    networks:
+#      - datamend-network
+
+#  mysql:
+#    image: mysql:8.0
+#    container_name: datamend-mysql
+#    environment:
+#      MYSQL_ROOT_PASSWORD: rootpass
+#      MYSQL_DATABASE: testdb
+#      MYSQL_USER: testuser
+#      MYSQL_PASSWORD: testpass
+#    ports:
+#      - "3306:3306"
+#    volumes:
+#      - mysql_data:/var/lib/mysql
+#    networks:
+#      - datamend-network
+
+networks:
+  datamend-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  mysql_data:

@@ -1,10 +1,32 @@
 # DataMend - Data Quality Management Platform
 
-A comprehensive data quality management system that provides advanced data profiling, anomaly detection, and AI-powered insights across multiple data sources including files, databases, and big data platforms.
+A comprehensive, cross-platform data quality management system that provides advanced data profiling, anomaly detection, and AI-powered insights across multiple data sources including files, databases, and big data platforms.
 
 ## Overview
 
-DataMend is designed to help organizations ensure data quality across their entire data infrastructure. It provides automated data profiling, statistical anomaly detection, and AI-driven recommendations to improve data quality and reliability.
+DataMend is designed to help organizations ensure data quality across their entire data infrastructure, regardless of their operating system or deployment environment. Built with Python and web technologies, it provides automated data profiling, statistical anomaly detection, and AI-driven recommendations to improve data quality and reliability across Windows, macOS, Linux, and containerized environments.
+
+## Platform Independence
+
+DataMend is built with cross-platform compatibility as a core principle:
+
+### Operating System Support
+- **Windows**: Full native support with PowerShell and Command Prompt
+- **macOS**: Native support with Terminal and shell environments
+- **Linux**: Complete compatibility with all major distributions (Ubuntu, CentOS, RHEL, etc.)
+- **Unix-like Systems**: Support for FreeBSD, OpenBSD, and other Unix variants
+
+### Deployment Options
+- **Local Development**: Run directly on any OS with Python 3.10+
+- **Docker Containers**: Platform-agnostic containerized deployment
+- **Cloud Platforms**: Deploy on AWS, Azure, GCP, Oracle Cloud, or any cloud provider
+- **On-Premises**: Enterprise deployment in private data centers
+- **Hybrid Environments**: Mix of cloud and on-premises infrastructure
+
+### Browser Compatibility
+- **Universal Access**: Works with any modern web browser
+- **Cross-Device**: Responsive design for desktop, tablet, and mobile devices
+- **No Platform-Specific Dependencies**: Pure web-based interface accessible from any device
 
 ## Key Features
 
@@ -35,10 +57,46 @@ DataMend is designed to help organizations ensure data quality across their enti
 ## Installation
 
 ### Prerequisites
-- Python 3.10 or higher
-- pip package manager
+- **Python 3.10 or higher** (Available on all platforms)
+- **pip package manager** (Included with Python)
+- **Modern web browser** (Chrome, Firefox, Safari, Edge)
 
-### Setup Instructions
+### Platform-Specific Setup
+
+#### Windows
+```cmd
+# Using Command Prompt or PowerShell
+git clone https://github.com/Mesbahul-Islam/datamend.git
+cd datamend
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+streamlit run main.py
+```
+
+#### macOS
+```bash
+# Using Terminal
+git clone https://github.com/Mesbahul-Islam/datamend.git
+cd datamend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+streamlit run main.py
+```
+
+#### Linux/Unix
+```bash
+# Using Terminal/Shell
+git clone https://github.com/Mesbahul-Islam/datamend.git
+cd datamend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+streamlit run main.py
+```
+
+### Universal Setup Instructions
 
 1. **Clone the Repository**:
    ```bash
@@ -47,30 +105,49 @@ DataMend is designed to help organizations ensure data quality across their enti
    ```
 
 2. **Create Virtual Environment**:
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-   ```
+   - **Windows**: `python -m venv .venv && .venv\Scripts\activate`
+   - **macOS/Linux**: `python3 -m venv .venv && source .venv/bin/activate`
 
-3. **Install Dependencies**:
+3. **Install Dependencies** (Universal):
    ```bash
    pip install -r requirements.txt
    ```
 
 4. **Configure Environment Variables** (Optional):
    Copy and configure the `.env` file with your database credentials and API keys:
+   - **Windows**: `copy .env.example .env`
+   - **macOS/Linux**: `cp .env.example .env`
    ```bash
-   cp .env.example .env
-   # Edit .env with your specific configuration
+   # Edit .env with your specific configuration using your preferred editor
    ```
 
-5. **Run the Application**:
+5. **Run the Application** (All Platforms):
    ```bash
    streamlit run main.py
    ```
 
 6. **Access the Dashboard**:
-   Open your browser to `http://localhost:8501`
+   Open your browser to `http://localhost:8501` (works on all platforms)
+
+### Docker Deployment (Platform Independent)
+
+For the most consistent cross-platform experience, use Docker:
+
+#### Quick Start with Docker
+```bash
+# Development environment (all platforms)
+docker-compose -f docker-compose.dev.yml up --build
+
+# Production environment (all platforms)
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+#### Platform-Specific Docker Installation
+- **Windows**: Install Docker Desktop for Windows
+- **macOS**: Install Docker Desktop for Mac
+- **Linux**: Install Docker Engine (varies by distribution)
+
+See `DOCKER.md` for comprehensive Docker deployment instructions.
 
 ## Configuration
 
@@ -199,81 +276,117 @@ datamend/
 └── tests/                          # Test suite
 ```
 
-### Technology Stack
-- **Frontend**: Streamlit for web interface
-- **Data Processing**: Pandas, NumPy for data manipulation
-- **Profiling**: ydata-profiling for comprehensive analysis
-- **Visualization**: Plotly, Matplotlib for charts and graphs
-- **Database Connectivity**: Native drivers for Snowflake, Oracle, HDFS
-- **AI Integration**: Google Gemini and OpenAI API support
-- **Session Management**: Streamlit session state
+### Technology Stack (Cross-Platform)
+- **Frontend**: Streamlit (web-based, platform-independent interface)
+- **Backend**: Python (runs on Windows, macOS, Linux, Unix)
+- **Data Processing**: Pandas, NumPy (cross-platform data manipulation)
+- **Profiling**: ydata-profiling (universal data analysis)
+- **Visualization**: Plotly, Matplotlib (browser-based charts, works everywhere)
+- **Database Connectivity**: Native drivers with cross-platform support
+  - Snowflake: Works on all platforms
+  - Oracle: Cross-platform oracledb driver
+  - HDFS: Platform-independent Python clients
+- **AI Integration**: Web-based APIs (Google Gemini, OpenAI) - platform agnostic
+- **Session Management**: Browser-based (works on any device/OS)
+- **Containerization**: Docker support for consistent deployment across environments
 
-## Dependencies
+## Dependencies (Cross-Platform Compatible)
 
-### Core Requirements
-- streamlit==1.49.1
-- pandas>=1.5.0
-- numpy>=1.24.0
-- ydata-profiling==4.16.0
-- plotly==6.3.0
-- matplotlib>=3.6.0
+All dependencies are designed to work across Windows, macOS, Linux, and Unix systems:
 
-### Database Connectors
-- snowflake-connector-python==3.17.3
-- oracledb>=2.0.0
-- hdfs3>=0.3.1
+### Core Requirements (Universal)
+- streamlit==1.49.1 (web framework - platform independent)
+- pandas>=1.5.0 (cross-platform data processing)
+- numpy>=1.24.0 (universal numerical computing)
+- ydata-profiling==4.16.0 (works on all platforms)
+- plotly==6.3.0 (browser-based visualization)
+- matplotlib>=3.6.0 (cross-platform plotting)
 
-### AI Integration
-- google-genai==1.38.0
-- openai>=1.0.0
+### Database Connectors (Multi-Platform)
+- snowflake-connector-python==3.17.3 (Windows, macOS, Linux support)
+- oracledb>=2.0.0 (cross-platform Oracle connectivity)
+- hdfs3>=0.3.1 (platform-independent HDFS client)
 
-### Additional Libraries
-- python-dotenv==1.1.1
-- openpyxl>=3.0.0
-- xlrd>=2.0.0
-- networkx>=3.0.0
-- SQLAlchemy==2.0.43
+### AI Integration (API-Based, Platform Agnostic)
+- google-genai==1.38.0 (web API - works everywhere)
+- openai>=1.0.0 (web API - universal access)
 
-## Performance Considerations
+### Additional Libraries (Cross-Platform)
+- python-dotenv==1.1.1 (environment configuration)
+- openpyxl>=3.0.0 (Excel file support - all platforms)
+- xlrd>=2.0.0 (legacy Excel support)
+- networkx>=3.0.0 (graph processing)
+- SQLAlchemy==2.0.43 (database abstraction layer)
 
-### Large Dataset Handling
+## Performance Considerations (Platform Optimized)
+
+### Large Dataset Handling (Universal)
 - Configurable row limits for initial analysis
-- Memory-efficient chunked processing
-- Optimized data loading strategies
+- Memory-efficient chunked processing (optimized for each platform)
+- Cross-platform data loading strategies
 
-### Database Connections
-- Connection pooling for improved performance
-- Timeout configuration for network reliability
-- Automatic connection management
+### Database Connections (Multi-Platform)
+- Connection pooling for improved performance across all systems
+- Platform-specific timeout configuration for network reliability
+- Automatic connection management (Windows, macOS, Linux compatible)
 
-### HDFS Integration
-- Supports multiple file formats (CSV, Parquet, JSON, Excel)
+### HDFS Integration (Cross-Platform)
+- Supports multiple file formats (CSV, Parquet, JSON, Excel) on all platforms
 - Directory browsing with depth limitations
-- Efficient file transfer mechanisms
+- Efficient file transfer mechanisms optimized for different OS environments
 
-## Troubleshooting
+### Resource Optimization
+- **Windows**: Optimized for Windows file system and memory management
+- **macOS**: Tuned for macOS performance characteristics
+- **Linux**: Optimized for Linux container and server environments
+- **Docker**: Consistent performance across all host platforms
+
+## Troubleshooting (Platform-Specific Guidance)
 
 ### Common Issues
 
-#### Connection Problems
-- Verify network connectivity and firewall settings
+#### Installation Problems
+**Windows:**
+- Use PowerShell as Administrator if permission issues occur
+- Ensure Python is added to PATH environment variable
+- Consider using Windows Subsystem for Linux (WSL) for Unix-like experience
+
+**macOS:**
+- Install Xcode Command Line Tools: `xcode-select --install`
+- Use Homebrew for Python if system version is outdated
+- Check Python installation with `python3 --version`
+
+**Linux:**
+- Install build essentials: `sudo apt-get install build-essential` (Ubuntu/Debian)
+- Ensure Python development headers: `sudo apt-get install python3-dev`
+- For RHEL/CentOS: `sudo yum install python3-devel gcc`
+
+#### Connection Problems (Universal)
+- Verify network connectivity and firewall settings (platform-specific firewall tools)
 - Check credential configuration in environment variables
-- Ensure database services are running and accessible
+- Ensure database services are running and accessible from your platform
 
-#### Performance Issues
-- Reduce data loading limits for large datasets
-- Increase timeout settings for slow connections
-- Monitor memory usage during processing
+#### Performance Issues (Platform-Optimized Solutions)
+- **Windows**: Monitor Task Manager for memory usage, adjust virtual memory settings
+- **macOS**: Use Activity Monitor, consider increasing Docker memory allocation
+- **Linux**: Monitor with `htop`, adjust container limits in production environments
+- **All Platforms**: Reduce data loading limits for large datasets
 
-#### HDFS Connectivity
-- Verify NameNode URL and port configuration
-- Check HDFS service availability
-- Ensure proper authentication credentials
+#### Docker-Specific Issues
+- **Windows**: Enable WSL 2 backend for better performance
+- **macOS**: Allocate sufficient memory in Docker Desktop preferences
+- **Linux**: Ensure Docker daemon is running and user has proper permissions
 
-### Error Resolution
-- Review application logs for detailed error messages
-- Verify environment variable configuration
-- Check data format compatibility
+### Platform-Specific Error Resolution
+- **Windows**: Check Event Viewer for system-level errors
+- **macOS**: Review Console app for application logs
+- **Linux**: Check system logs with `journalctl` or `/var/log/`
+- **All Platforms**: Review application logs in Streamlit interface
+
+### Environment Variable Configuration
+- **Windows**: Use System Properties → Environment Variables or PowerShell `$env:` commands
+- **macOS/Linux**: Use shell profile files (`.bashrc`, `.zshrc`) or export commands
+- **Docker**: Configure through docker-compose environment sections
 
 ## License
 
